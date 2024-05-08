@@ -29,6 +29,7 @@ class Report:
         self.state = State.REPORT_START
         self.client = client
         self.message = None
+        self.reported_user = None
     
     async def handle_message(self, message):
         '''
@@ -67,6 +68,7 @@ class Report:
 
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
+            self.reported_user = message.author.name
             reply = "I found this message:" + "```" + message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
             reply += "1. Spam.\n"
@@ -163,7 +165,7 @@ class Report:
     def complete_report(self):
         self.state = State.BLOCK_USER
         reply = "Thank you for submitting a report. Our content moderation will review the report and take appropriate action. This may include contacting local authorities.\n\n"
-        reply += "Would you like to block the user whose message you just reported?\n"
+        reply += f"Would you like to block `{self.reported_user}`?\n"
         reply += "You will no longer be able to interact with them.\n"
         reply += "Please reply with `yes` or `no`."
         return [reply]
