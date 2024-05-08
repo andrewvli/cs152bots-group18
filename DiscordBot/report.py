@@ -260,6 +260,7 @@ class Report:
                 reply = "Thank you. User '" + self.reported_user + "' has been blocked."
             else:
                 reply = "Thank you. User '" + self.reported_user + "' has not been blocked."
+            self.state = State.BLOCK_COMPLETE
             return [reply]
 
         return []
