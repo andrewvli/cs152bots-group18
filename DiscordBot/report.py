@@ -227,7 +227,7 @@ class Report:
         return [reply]
 
 
-    def is_report_complete(self):
+    def report_complete(self):
         return self.state == State.REPORT_COMPLETE
 
 
@@ -263,7 +263,6 @@ class Report:
             return [reply]
 
         return []
-
 
     def block_complete(self):
         return self.state == State.BLOCK_COMPLETE
