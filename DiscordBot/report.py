@@ -12,12 +12,15 @@ class State(Enum):
     AWAITING_BLOCK = auto()
     AWAITING_BLOCK_CONFIRM = auto()
     BLOCK_COMPLETE = auto()
+    PROMPTING_ADDITIONAL_DETAILS = auto()
+    AWAITING_DETAILS = auto()
 
     # Abuse Types
     SPAM = auto()
     OFFENSIVE_CONTENT = auto()
     NUDITY = auto()
     FRAUD = auto()
+    FINANCIAL_FRAUD_CLASSIFICATION = auto()
     MISINFORMATION = auto()
     HATE_HARASSMENT = auto()
     CSAM = auto()
@@ -111,8 +114,24 @@ class Report:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            # TO-DO: ALLOW FOR CLASSIFICATION OF FINANCIAL FRAUD
+            if message.content == "4":
+                self.state = State.FINANCIAL_FRAUD_CLASSIFICATION
+                reply = "What kind of financial fraud are you reporting?\n"
+                reply += "1. Cryptocurrency.\n"
+                reply += "2. Investment.\n"
+                reply += "3. Phishing.\n"
+                reply += "4. Credit card fraud.\n"
+                return [reply]
+            
             return self.complete_report()
+        
+        if self.state == State.FINANCIAL_FRAUD_CLASSIFICATION:
+            if message.content not in ["1", "2", "3", "4"]:
+                return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
+            
+            self.state = State.PROMPTING_ADDITIONAL_DETAILS
+            reply = "We may investigate your private message history when evaluating this report. Would you like to include any additional details? Please respond with `yes` or `no`."
+            return [reply]
         
         if self.state == State.MISINFORMATION:
             if message.content not in ["1", "2"]:
@@ -130,6 +149,20 @@ class Report:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            return self.complete_report()
+        
+        if self.state == State.PROMPTING_ADDITIONAL_DETAILS:
+            if message.content != "yes" and message.content != "no":
+                return ["That is not a valid option. Please reply with `yes` or `no`."]
+            
+            self.state = State.AWAITING_DETAILS
+            if message.content == "yes":
+                return ["Please provide any additional details below."]
+            elif message.content == "no":
+                return self.complete_report()
+
+        if self.state == State.AWAITING_DETAILS:
+            # TO-DO: store these additional details somewhere
             return self.complete_report()
         
         if self.state == State.BLOCK_USER:
