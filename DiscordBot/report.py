@@ -57,7 +57,7 @@ class Report:
             return await self.handle_block(message)
         
         if message.content.startswith(self.START_KEYWORD):
-            reply =  "Thank you for starting the reporting process. "
+            reply =  "Thank you for starting the reporting process."
             reply += "Say `help` at any time for more information.\n\n"
             reply += "Please copy paste the link to the message you want to report.\n"
             reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."

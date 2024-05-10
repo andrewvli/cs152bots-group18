@@ -7,6 +7,7 @@ import logging
 import re
 import requests
 from report import Report
+from mod import Review
 import pdb
 
 # Set up logging to the console
@@ -34,7 +35,7 @@ class ModBot(discord.Client):
         self.group_num = None
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
-
+        self.reviews = {}
         self.reports_to_review = []
 
     async def on_ready(self):
@@ -115,15 +116,31 @@ class ModBot(discord.Client):
         
 
     async def handle_channel_message(self, message):
-        # Only handle messages sent in the "group-#" channel
-        if not message.channel.name == f'group-{self.group_num}':
+        # Only handle messages sent in the "group-#" or "group-#-mod" channel
+        if not message.channel.name == f'group-{self.group_num}' and not message.channel.name == f'group-{self.group_num}-mod':
             return
+                
+        author_id = message.author.id
+
+        if author_id not in self.reports:
+            self.reviews[author_id] = Review(self)
+            
+        if message.channel.name == f'group-{self.group_num}-mod':
+            if message.content.split()[0] == Review.START_KEYWORD:
+                responses = await self.reviews[author_id].handle_review(message)
+            else: 
+                if author_id in self.reports:
+                    responses = await self.reviews[author_id].handle_review(message)
+
+        if responses: 
+            for r in responses:
+                await message.channel.send(r)
 
         # Forward the message to the mod channel
-        mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-        scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
+        # mod_channel = self.mod_channels[message.guild.id]
+        # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+        # scores = self.eval_text(message.content)
+        # await mod_channel.send(self.code_format(scores))
 
     
     def eval_text(self, message):
