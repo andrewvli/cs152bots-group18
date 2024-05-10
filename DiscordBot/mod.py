@@ -4,7 +4,7 @@ import re
 
 class State(Enum):
     REVIEW_START = auto()
-    AWAITING_MESSAGE = auto()
+    REVIEWING_VIOLATION = auto()
 
 class Review:
     START_KEYWORD = "review"
@@ -13,15 +13,12 @@ class Review:
         self.state = State.REVIEW_START
         self.client = client
         self.message = None
-        self.reported_user = None
+        self.report = None
 
     async def handle_review(self, message):
         '''
-        This function makes up the meat of the user-side reporting flow. It defines how we transition between states and what 
-        prompts to offer at each of those states. You're welcome to change anything you want; this skeleton is just here to
-        get you started and give you a model for working with Discord. 
+        This function handles the moderator-side review process for reported messages.
         '''
-        
         if message.content.startswith(self.START_KEYWORD):
             if len(self.client.reports_to_review) == 0:
                 reply = "There are no pending reports to review.\n"
@@ -30,12 +27,24 @@ class Review:
             reply = "Thank you for starting the reviewing process.\n"
             reply += "Here is the next report to review.\n\n"
 
-            report = self.client.reports_to_review.pop(0)
-            reply += f"User reported: `{report.reported_user}`\n"
-            reply += f"Message reported: `{report.reported_message}`\n"
-            reply += f"Report category: {report.report_category}\n"
-            reply += f"Additional details filed by reporting: {report.additional_details}\n\n"
+            self.report = self.client.reports_to_review.pop(0)
+            reply += f"User reported: `{self.report.reported_user}`\n"
+            reply += f"Message reported: `{self.report.reported_message.content}`\n"
+            reply += f"Report category: {self.report.report_category}\n"
+            reply += f"Additional details filed by reporting: {self.report.additional_details}\n\n"
 
+            reply += f"Is this in violation of platform policies? Please respond with `yes` or `no`."
+            self.state = State.REVIEWING_VIOLATION
             return [reply]
+        
+        if self.state == State.REVIEWING_VIOLATION:
+            if message.content != "yes" and message.content != "no":
+                return ["Please respond with `yes` or `no`."]
+            
+            if message.content == "yes":
+                await self.report.reported_message.delete()
+                reply = "Violating content has been removed.\n"
+                reply += "Was the content illegal? Does the content pose an immediate danger? Please respond with `yes` or `no`."
+                return [reply]
             
         return []

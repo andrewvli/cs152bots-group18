@@ -123,14 +123,14 @@ class ModBot(discord.Client):
         author_id = message.author.id
         responses = []
 
-        if author_id not in self.reports:
+        if author_id not in self.reviews:
             self.reviews[author_id] = Review(self)
             
         if message.channel.name == f'group-{self.group_num}-mod':
             if message.content.split()[0] == Review.START_KEYWORD:
                 responses = await self.reviews[author_id].handle_review(message)
             else: 
-                if author_id in self.reports:
+                if author_id in self.reviews:
                     responses = await self.reviews[author_id].handle_review(message)
 
         if responses: 

@@ -83,7 +83,7 @@ class Report:
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
             self.reported_user = message.author.name
-            self.reported_message = message.content
+            self.reported_message = message
             reply = "I found this message:" + "```" + message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
             reply += "1. Spam.\n"
