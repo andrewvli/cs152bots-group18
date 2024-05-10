@@ -5,6 +5,8 @@ import re
 class State(Enum):
     REVIEW_START = auto()
     REVIEWING_VIOLATION = auto()
+    REVIEWING_NONVIOLATION = auto()
+    REVIEWING_ADVERSARIAL_REPORTING = auto()
     REVIEWING_LEGALITY_DANGER = auto()
     REVIEWING_FRAUD_SCAM_1 = auto()
     REVIEWING_FRAUD_SCAM_2 = auto()
@@ -47,6 +49,34 @@ class Review:
                 reply += "Was the content illegal? Does the content pose an immediate danger? Please respond with `yes` or `no`."
                 self.state = State.REVIEWING_LEGALITY_DANGER
                 return [reply]
+            else:
+                reply = "Do you suspect the content was reported maliciously? Please respond with `yes` or `no`."
+                self.state = State.REVIEWING_NONVIOLATION
+                return [reply]
+
+        if self.state == State.REVIEWING_NONVIOLATION:
+            if message.content != "yes" and message.content != "no":
+                return ["Please respond with `yes` or `no`."]
+
+            if message.content == "yes":
+                reply = "Do you suspect there was coordinated reporting from multiple actors? Please respond with `yes` or `no`."
+                self.state = State.REVIEWING_ADVERSARIAL_REPORTING
+            else:
+                reply = "Thank you. No further action will be taken.\n\n"
+                reply += self.prompt_new_review()
+            return [reply]
+
+        if self.state == State.REVIEWING_ADVERSARIAL_REPORTING:
+            if message.content != "yes" and message.content != "no":
+                return ["Please respond with `yes` or `no`."]
+            
+            if message.content == "yes":
+                reply = f"Reported user `{self.report.reported_user}` has been temporarily banned.\n"
+                reply += "This report will be escalated to higher moderation teams for further review.\n\n"
+            else:
+                reply = f"Reported user `{self.report.reported_user}` has been temporarily banned.\n"
+            reply += self.prompt_new_review()
+            return [reply]
             
         if self.state == State.REVIEWING_LEGALITY_DANGER:
             if message.content != "yes" and message.content != "no":
