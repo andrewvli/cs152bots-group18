@@ -180,7 +180,7 @@ class Report:
             if message.content == "yes":
                 return ["Thank you. The user has been blocked."]
             else: 
-                return []
+                return ["Thank you. The user has not been blocked."]
 
         return []
     
