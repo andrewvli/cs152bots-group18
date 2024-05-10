@@ -297,7 +297,7 @@ class Report:
 
         if self.state == State.AWAITING_BLOCK:
             self.reported_user = message.content.lower()
-            reply = "Please confirm that you would like to block '" + self.reported_user + "'\n"
+            reply = f"Please confirm that you would like to block `{self.reported_user}`.\n"
             reply += "You will no longer be able to interact with them.\n"
             reply += "Please reply with `yes` or `no`."
             self.state = State.AWAITING_BLOCK_CONFIRM
@@ -305,9 +305,9 @@ class Report:
         
         if self.state == State.AWAITING_BLOCK_CONFIRM:
             if message.content.lower() == "yes":
-                reply = "Thank you. User '" + self.reported_user + "' has been blocked."
+                reply = f"Thank you. `{self.reported_user}` has been blocked."
             else:
-                reply = "Thank you. User '" + self.reported_user + "' has not been blocked."
+                reply = f"Thank you. `{self.reported_user}` has not been blocked."
             self.state = State.BLOCK_COMPLETE
             return [reply]
 
