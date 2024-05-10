@@ -35,6 +35,8 @@ class ModBot(discord.Client):
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
 
+        self.reports_to_review = []
+
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
@@ -108,6 +110,7 @@ class ModBot(discord.Client):
 
         # If the report/block is complete or cancelled, remove it from our map
         if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
+            self.reports_to_review.append(self.reports[author_id])
             self.reports.pop(author_id)
         
 

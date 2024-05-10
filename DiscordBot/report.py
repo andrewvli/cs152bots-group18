@@ -38,6 +38,9 @@ class Report:
         self.client = client
         self.message = None
         self.reported_user = None
+        self.reported_message = None
+        self.report_category = None
+        self.additional_details = None
     
     async def handle_message(self, message):
         '''
@@ -80,6 +83,7 @@ class Report:
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
             self.reported_user = message.author.name
+            self.reported_message = message.content
             reply = "I found this message:" + "```" + message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
             reply += "1. Spam.\n"
@@ -102,18 +106,21 @@ class Report:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.report_category = State.OFFENSIVE_CONTENT
             return self.complete_report()
         
         if self.state == State.NUDITY:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.report_category = State.NUDITY
             return self.complete_report()
         
         if self.state == State.FRAUD:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.report_category = State.FRAUD
             if message.content == "4":
                 self.state = State.FINANCIAL_FRAUD_CLASSIFICATION
                 reply = "What kind of financial fraud are you reporting?\n"
@@ -137,18 +144,21 @@ class Report:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.MISINFORMATION
             return self.complete_report()
         
         if self.state == State.HATE_HARASSMENT:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.HATE_HARASSMENT
             return self.complete_report()
         
         if self.state == State.INTELLECTUAL:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.HATE_HARASSMENT
             return self.complete_report()
         
         if self.state == State.PROMPTING_ADDITIONAL_DETAILS:
@@ -162,7 +172,7 @@ class Report:
                 return self.complete_report()
 
         if self.state == State.AWAITING_DETAILS:
-            # TO-DO: store these additional details somewhere
+            self.additional_details = message.content
             return self.complete_report()
         
         if self.state == State.BLOCK_USER:
