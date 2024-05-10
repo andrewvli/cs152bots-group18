@@ -23,8 +23,19 @@ class Review:
         '''
         
         if message.content.startswith(self.START_KEYWORD):
+            if len(self.client.reports_to_review) == 0:
+                reply = "There are no pending reports to review.\n"
+                return [reply]
+
             reply = "Thank you for starting the reviewing process.\n"
-            reply += "Here is the next report to review."
+            reply += "Here is the next report to review.\n\n"
+
+            report = self.client.reports_to_review.pop(0)
+            reply += f"User reported: `{report.reported_user}`\n"
+            reply += f"Message reported: `{report.reported_message}`\n"
+            reply += f"Report category: {report.report_category}\n"
+            reply += f"Additional details filed by reporting: {report.additional_details}\n\n"
+
             return [reply]
             
         return []

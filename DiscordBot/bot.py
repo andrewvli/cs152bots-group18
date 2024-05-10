@@ -121,6 +121,7 @@ class ModBot(discord.Client):
             return
                 
         author_id = message.author.id
+        responses = []
 
         if author_id not in self.reports:
             self.reviews[author_id] = Review(self)
@@ -141,7 +142,6 @@ class ModBot(discord.Client):
         # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
         # scores = self.eval_text(message.content)
         # await mod_channel.send(self.code_format(scores))
-
     
     def eval_text(self, message):
         ''''

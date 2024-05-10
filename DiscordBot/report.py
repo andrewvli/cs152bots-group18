@@ -106,21 +106,18 @@ class Report:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.report_category = State.OFFENSIVE_CONTENT
             return self.complete_report()
         
         if self.state == State.NUDITY:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.report_category = State.NUDITY
             return self.complete_report()
         
         if self.state == State.FRAUD:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.report_category = State.FRAUD
             if message.content == "4":
                 self.state = State.FINANCIAL_FRAUD_CLASSIFICATION
                 reply = "What kind of financial fraud are you reporting?\n"
@@ -190,26 +187,34 @@ class Report:
 
     def classify_report(self, message):
         if message.content == "1":
+            self.report_category = State.SPAM
             return self.complete_report()
         elif message.content == "2":
             self.state = State.OFFENSIVE_CONTENT
+            self.report_category = State.OFFENSIVE_CONTENT
             return self.classify_offensive_content()
         elif message.content == "3":
             self.state = State.NUDITY
+            self.report_category = State.NUDITY
             return self.classify_nudity()
         elif message.content == "4":
             self.state = State.FRAUD
+            self.report_category = State.FRAUD
             return self.classify_fraud()
         elif message.content == "5":
             self.state = State.MISINFORMATION
+            self.report_category = State.MISINFORMATION
             return self.classify_misinformation()
         elif message.content == "6":
             self.state = State.HATE_HARASSMENT
+            self.report_category = State.HATE_HARASSMENT
             return self.classify_hate_harassment()
         elif message.content == "7":
+            self.report_category = State.CSAM
             return self.complete_report()
         else:
             self.state = State.INTELLECTUAL
+            self.report_category = State.INTELLECTUAL
             return self.classify_intellectual()
 
 
