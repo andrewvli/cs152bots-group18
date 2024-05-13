@@ -183,6 +183,7 @@ class Review:
         reply += f"User reported: `{self.report.reported_user}`\n"
         reply += f"Message reported: `{self.report.reported_message.content}`\n"
         reply += f"Report category: {self.report.report_category}\n"
+        reply += f"Report subcategory: {self.report.report_subcategory}\n"
         reply += f"Additional details filed by reporting: {self.report.additional_details}\n\n"
 
         reply += f"Is this in violation of platform policies? Please respond with `yes` or `no`."

@@ -146,7 +146,7 @@ class Report:
             elif message.content == "3":
                 self.report_subcategory = State.VIOLENCE_ABUSE
             else:
-                self.report_category = State.DEATH_SEVERE_INJURY
+                self.report_subcategory = State.DEATH_SEVERE_INJURY
             
             return self.complete_report()
         
