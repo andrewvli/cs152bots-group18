@@ -17,21 +17,48 @@ class State(Enum):
 
     # Abuse Types
     SPAM = auto()
-    OFFENSIVE_CONTENT = auto()
-    NUDITY = auto()
+    HARM_ENDANGERMENT = auto()
+    SEXUALLY_EXPLICIT = auto()
     FRAUD = auto()
     FINANCIAL_FRAUD_CLASSIFICATION = auto()
     MISINFORMATION = auto()
     HATE_HARASSMENT = auto()
     CSAM = auto()
     INTELLECTUAL = auto()
+    ILLICIT_TRADE_SUBSTANCES = auto()
+
+    # Abuse Subcategories
+    DRUGS = auto()
+    COUNTERFEIT_GOODS = auto()
+    BLACK_MARKET = auto()
+    COPYRIGHT = auto()
+    TRADEMARK = auto()
+    SELF_HARM = auto()
+    TERRORISM = auto()
+    VIOLENCE_ABUSE = auto()
+    DEATH_SEVERE_INJURY = auto()
+    NUDITY_PORNOGRAPHY = auto()
+    SEXUAL_HARASSMENT_OR_ABUSE = auto()
+    IMPERSONATION = auto()
+    ROMANCE = auto()
+    HEALTH = auto()
+    CRYPTOCURRENCY = auto()
+    INVESTMENT = auto()
+    PHISHING = auto()
+    CREDIT_CARD = auto()
+    CLIMATE = auto()
+    POLITICAL = auto()
+    BULLYING = auto()
+    DOXXING = auto()
+    HATE_SPEECH = auto()
+    STALKING = auto()
 
 class Report:
     START_KEYWORD = "report"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
     BLOCK_KEYWORD = "block"
-    REPORTING_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"]
+    REPORTING_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
     def __init__(self, client):
         self.state = None  # Allows transition between `report` and `block` midway through processes
@@ -40,6 +67,7 @@ class Report:
         self.reported_user = None
         self.reported_message = None
         self.report_category = None
+        self.report_subcategory = None
         self.additional_details = None
     
     async def handle_message(self, message):
@@ -87,13 +115,14 @@ class Report:
             reply = "I found this message:" + "```" + message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
             reply += "1. Spam.\n"
-            reply += "2. Offensive content.\n"
+            reply += "2. Harm and endangerment.\n"
             reply += "3. Nudity and sexual content.\n"
             reply += "4. Fraud or scam.\n"
             reply += "5. Misinformation.\n"
             reply += "6. Hate and harassment.\n"
-            reply += "7. Child sexual abuse material.\n"
+            reply += "7. Sexual content involving a child.\n"
             reply += "8. Intellectual property theft.\n"
+            reply += "9. Illicit trade and substances.\n"
             return [reply]
         
         if self.state == State.MESSAGE_IDENTIFIED:
@@ -102,23 +131,41 @@ class Report:
 
             return self.classify_report(message)
 
-        if self.state == State.OFFENSIVE_CONTENT:
+        if self.state == State.HARM_ENDANGERMENT:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            if message.content == "1":
+                self.report_subcategory = State.SELF_HARM
+            elif message.content == "2":
+                self.report_subcategory = State.TERRORISM
+            elif message.content == "3":
+                self.report_subcategory = State.VIOLENCE_ABUSE
+            else:
+                self.report_category = State.DEATH_SEVERE_INJURY
+            
             return self.complete_report()
         
-        if self.state == State.NUDITY:
+        if self.state == State.SEXUALLY_EXPLICIT:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
+            
+            if message.content == "1":
+                self.report_subcategory = State.NUDITY_PORNOGRAPHY
+            else:
+                self.report_subcategory = State.SEXUAL_HARASSMENT_OR_ABUSE
             
             return self.complete_report()
         
         if self.state == State.FRAUD:
-            if message.content not in ["1", "2", "3", "4"]:
+            if message.content not in ["1", "2", "3"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            if message.content == "4":
+            if message.content == "1":
+                self.report_subcategory = State.IMPERSONATION
+            elif message.content == "2":
+                self.report_subcategory = State.ROMANCE
+            else:
                 self.state = State.FINANCIAL_FRAUD_CLASSIFICATION
                 reply = "What kind of financial fraud are you reporting?\n"
                 reply += "1. Cryptocurrency.\n"
@@ -133,29 +180,69 @@ class Report:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            if message.content == "1":
+                self.report_subcategory = State.CRYPTOCURRENCY
+            elif message.content == "2":
+                self.report_subcategory = State.INVESTMENT
+            elif message.content == "3":
+                self.report_subcategory = State.PHISHING
+            else:
+                self.report_subcategory = State.CREDIT_CARD
+            
             self.state = State.PROMPTING_ADDITIONAL_DETAILS
             reply = "We may investigate your private message history when evaluating this report. Would you like to include any additional details? Please respond with `yes` or `no`."
             return [reply]
         
         if self.state == State.MISINFORMATION:
-            if message.content not in ["1", "2"]:
+            if message.content not in ["1", "2", "3"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.state = State.MISINFORMATION
+            if message.content == "1":
+                self.report_subcategory = State.HEALTH
+            elif message.content == "2":
+                self.report_subcategory = State.CLIMATE
+            else:
+                self.report_subcategory = State.POLITICAL
+            
             return self.complete_report()
         
         if self.state == State.HATE_HARASSMENT:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.state = State.HATE_HARASSMENT
+            if message.content == "1":
+                self.report_subcategory = State.BULLYING
+            elif message.content == "2":
+                self.report_subcategory = State.DOXXING
+            elif message.content == "3":
+                self.report_subcategory = State.HATE_SPEECH
+            else:
+                self.report_subcategory = State.STALKING
+
             return self.complete_report()
         
         if self.state == State.INTELLECTUAL:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
-            self.state = State.HATE_HARASSMENT
+            if message.content == "1":
+                self.report_subcategory = State.COPYRIGHT
+            else:
+                self.report_subcategory = State.TRADEMARK
+            
+            return self.complete_report()
+        
+        if self.state == State.ILLICIT_TRADE_SUBSTANCES:
+            if message.content not in ["1", "2", "3"]:
+                return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
+            
+            if message.content == "1":
+                self.report_subcategory = State.DRUGS
+            elif message.content == "2":
+                self.report_subcategory = State.COUNTERFEIT_GOODS
+            else:
+                self.report_subcategory = State.BLACK_MARKET
+
             return self.complete_report()
         
         if self.state == State.PROMPTING_ADDITIONAL_DETAILS:
@@ -190,12 +277,12 @@ class Report:
             self.report_category = State.SPAM
             return self.complete_report()
         elif message.content == "2":
-            self.state = State.OFFENSIVE_CONTENT
-            self.report_category = State.OFFENSIVE_CONTENT
+            self.state = State.HARM_ENDANGERMENT
+            self.report_category = State.HARM_ENDANGERMENT
             return self.classify_offensive_content()
         elif message.content == "3":
-            self.state = State.NUDITY
-            self.report_category = State.NUDITY
+            self.state = State.SEXUALLY_EXPLICIT
+            self.report_category = State.SEXUALLY_EXPLICIT
             return self.classify_nudity()
         elif message.content == "4":
             self.state = State.FRAUD
@@ -212,10 +299,14 @@ class Report:
         elif message.content == "7":
             self.report_category = State.CSAM
             return self.complete_report()
-        else:
+        elif message.content == "8":
             self.state = State.INTELLECTUAL
             self.report_category = State.INTELLECTUAL
             return self.classify_intellectual()
+        else:
+            self.state = State.ILLICIT_TRADE_SUBSTANCES
+            self.report_category = State.ILLICIT_TRADE_SUBSTANCES
+            return self.classify_illicit_trade()
 
 
     def complete_report(self):
@@ -229,17 +320,17 @@ class Report:
     
     def classify_offensive_content(self):
         reply = "What kind of offensive content are you reporting? Please select the number corresponding to the appropriate category.\n\n"
-        reply += "1. Illegal drug use.\n"
-        reply += "2. Gore and graphic violence.\n"
-        reply += "3. Sale or promotion of counterfeit goods.\n"
-        reply += "4. Self-harm or suicidal content.\n"
+        reply += "1. Self-harm or suicidal content.\n"
+        reply += "2. Terrorism.\n"
+        reply += "3. Threats or depictions of violence and abuse.\n"
+        reply += "4. Death or severe injury.\n"
         return [reply]
     
     
     def classify_nudity(self):
         reply = "What kind of sexually explicit content are you reporting? Please select the number corresponding to the appropriate category.\n\n"
-        reply += "1. Adult nudity.\n"
-        reply += "2. Adult pornography.\n"
+        reply += "1. Adult nudity or pornography.\n"
+        reply += "2. Sexual harassment or abuse.\n"
         return [reply]
     
 
@@ -247,8 +338,7 @@ class Report:
         reply = "What kind of fraud or scam are you reporting? Please select the number corresponding to the appropriate category.\n\n"
         reply += "1. Impersonation.\n"
         reply += "2. Romance.\n"
-        reply += "3. Investment.\n"
-        reply += "4. Financial.\n"
+        reply += "3. Financial.\n"
         return [reply]
     
 
@@ -256,6 +346,7 @@ class Report:
         reply = "What kind of misinformation are you reporting? Please select the number corresponding to the appropriate category.\n\n"
         reply += "1. Health.\n"
         reply += "2. Climate.\n"
+        reply += "3. Political.\n"
         return [reply]
     
 
@@ -264,7 +355,7 @@ class Report:
         reply += "1. Bullying.\n"
         reply += "2. Revealing private information.\n"
         reply += "3. Hate speech.\n"
-        reply += "4. Credible threats of violence.\n"
+        reply += "4. Stalking.\n"
         return [reply]
     
 
@@ -272,6 +363,14 @@ class Report:
         reply = "What kind of intellectual property theft are you reporting? Please select the number corresponding to the appropriate category.\n\n"
         reply += "1. Infringes my copyright.\n"
         reply += "2. Infringes my trademark.\n"
+        return [reply]
+    
+
+    def classify_illicit_trade(self):
+        reply = "What kind of illicit trade and substances are you reporting? Please select the number corresponding to the appropriate category.\n\n"
+        reply += "1. Illegal drug use or sale.\n"
+        reply += "2. Sale or promotion of counterfeit goods.\n"
+        reply += "3. Black market and smuggling.\n"
         return [reply]
 
 
