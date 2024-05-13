@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import discord
 import re
+from datetime import datetime
 
 LOWER_PRIORITY = 2
 HIGHER_PRIORITY = 1
@@ -73,6 +74,12 @@ class Report:
         self.report_subcategory = None
         self.additional_details = None
         self.priority = None
+        self.time_reported = None
+
+
+    def __lt__(self, other):
+        return self.priority < other.priority and self.time_reported < other.time_reported
+
     
     async def handle_message(self, message):
         '''
@@ -94,6 +101,7 @@ class Report:
             reply += "Please copy paste the link to the message you want to report.\n"
             reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."
             self.state = State.AWAITING_MESSAGE
+            self.time_reported = datetime.now()
             return [reply]
 
         if self.state == State.AWAITING_MESSAGE:
