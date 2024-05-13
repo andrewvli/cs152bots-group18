@@ -118,7 +118,7 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                reply = "The harmful links have been blacklisted\n"
+                reply = "The harmful links have been blacklisted.\n"
             reply += f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
             reply += self.prompt_new_review()
             return [reply]
