@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import requests
+import heapq
 from report import Report
 from mod import Review
 import pdb
@@ -111,7 +112,7 @@ class ModBot(discord.Client):
 
         # If the report/block is complete or cancelled, remove it from our map
         if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
-            self.reports_to_review.append(self.reports[author_id])
+            heapq.heappush(self.reports_to_review, (self.reports[author_id].priority, self.reports[author_id]))
             self.reports.pop(author_id)
         
 

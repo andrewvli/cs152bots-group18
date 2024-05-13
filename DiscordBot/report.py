@@ -2,6 +2,9 @@ from enum import Enum, auto
 import discord
 import re
 
+LOWER_PRIORITY = 2
+HIGHER_PRIORITY = 1
+
 class State(Enum):
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
@@ -69,6 +72,7 @@ class Report:
         self.report_category = None
         self.report_subcategory = None
         self.additional_details = None
+        self.priority = None
     
     async def handle_message(self, message):
         '''
@@ -152,8 +156,10 @@ class Report:
             
             if message.content == "1":
                 self.report_subcategory = State.NUDITY_PORNOGRAPHY
+                self.priority = LOWER_PRIORITY
             else:
                 self.report_subcategory = State.SEXUAL_HARASSMENT_OR_ABUSE
+                self.priority = HIGHER_PRIORITY
             
             return self.complete_report()
         
@@ -275,10 +281,12 @@ class Report:
     def classify_report(self, message):
         if message.content == "1":
             self.report_category = State.SPAM
+            self.priority = LOWER_PRIORITY
             return self.complete_report()
         elif message.content == "2":
             self.state = State.HARM_ENDANGERMENT
             self.report_category = State.HARM_ENDANGERMENT
+            self.priority = HIGHER_PRIORITY
             return self.classify_offensive_content()
         elif message.content == "3":
             self.state = State.SEXUALLY_EXPLICIT
@@ -287,25 +295,31 @@ class Report:
         elif message.content == "4":
             self.state = State.FRAUD
             self.report_category = State.FRAUD
+            self.priority = LOWER_PRIORITY
             return self.classify_fraud()
         elif message.content == "5":
             self.state = State.MISINFORMATION
             self.report_category = State.MISINFORMATION
+            self.priority = LOWER_PRIORITY
             return self.classify_misinformation()
         elif message.content == "6":
             self.state = State.HATE_HARASSMENT
             self.report_category = State.HATE_HARASSMENT
+            self.priority = LOWER_PRIORITY
             return self.classify_hate_harassment()
         elif message.content == "7":
             self.report_category = State.CSAM
+            self.priority = HIGHER_PRIORITY
             return self.complete_report()
         elif message.content == "8":
             self.state = State.INTELLECTUAL
             self.report_category = State.INTELLECTUAL
+            self.priority = LOWER_PRIORITY
             return self.classify_intellectual()
         else:
             self.state = State.ILLICIT_TRADE_SUBSTANCES
             self.report_category = State.ILLICIT_TRADE_SUBSTANCES
+            self.priority = LOWER_PRIORITY
             return self.classify_illicit_trade()
 
 

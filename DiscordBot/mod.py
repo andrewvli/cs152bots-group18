@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import discord
 import re
+import heapq
 
 class State(Enum):
     REVIEW_START = auto()
@@ -177,7 +178,8 @@ class Review:
     def start_review(self):
         reply = "Here is the next report to review.\n\n"
 
-        self.report = self.client.reports_to_review.pop(0)
+        self.report = heapq.heappop(self.client.reports_to_review)[1]
+
         reply += f"User reported: `{self.report.reported_user}`\n"
         reply += f"Message reported: `{self.report.reported_message.content}`\n"
         reply += f"Report category: {self.report.report_category}\n"
