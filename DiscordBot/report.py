@@ -38,6 +38,9 @@ class Report:
         self.client = client
         self.message = None
         self.reported_user = None
+        self.reported_message = None
+        self.report_category = None
+        self.additional_details = None
     
     async def handle_message(self, message):
         '''
@@ -54,7 +57,7 @@ class Report:
             return await self.handle_block(message)
         
         if message.content.startswith(self.START_KEYWORD):
-            reply =  "Thank you for starting the reporting process. "
+            reply =  "Thank you for starting the reporting process."
             reply += "Say `help` at any time for more information.\n\n"
             reply += "Please copy paste the link to the message you want to report.\n"
             reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."
@@ -80,6 +83,7 @@ class Report:
             # Here we've found the message - it's up to you to decide what to do next!
             self.state = State.MESSAGE_IDENTIFIED
             self.reported_user = message.author.name
+            self.reported_message = message
             reply = "I found this message:" + "```" + message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
             reply += "1. Spam.\n"
@@ -137,18 +141,21 @@ class Report:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.MISINFORMATION
             return self.complete_report()
         
         if self.state == State.HATE_HARASSMENT:
             if message.content not in ["1", "2", "3", "4"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.HATE_HARASSMENT
             return self.complete_report()
         
         if self.state == State.INTELLECTUAL:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
             
+            self.state = State.HATE_HARASSMENT
             return self.complete_report()
         
         if self.state == State.PROMPTING_ADDITIONAL_DETAILS:
@@ -162,7 +169,7 @@ class Report:
                 return self.complete_report()
 
         if self.state == State.AWAITING_DETAILS:
-            # TO-DO: store these additional details somewhere
+            self.additional_details = message.content
             return self.complete_report()
         
         if self.state == State.BLOCK_USER:
@@ -173,33 +180,41 @@ class Report:
             if message.content == "yes":
                 return ["Thank you. The user has been blocked."]
             else: 
-                return []
+                return ["Thank you. The user has not been blocked."]
 
         return []
     
 
     def classify_report(self, message):
         if message.content == "1":
+            self.report_category = State.SPAM
             return self.complete_report()
         elif message.content == "2":
             self.state = State.OFFENSIVE_CONTENT
+            self.report_category = State.OFFENSIVE_CONTENT
             return self.classify_offensive_content()
         elif message.content == "3":
             self.state = State.NUDITY
+            self.report_category = State.NUDITY
             return self.classify_nudity()
         elif message.content == "4":
             self.state = State.FRAUD
+            self.report_category = State.FRAUD
             return self.classify_fraud()
         elif message.content == "5":
             self.state = State.MISINFORMATION
+            self.report_category = State.MISINFORMATION
             return self.classify_misinformation()
         elif message.content == "6":
             self.state = State.HATE_HARASSMENT
+            self.report_category = State.HATE_HARASSMENT
             return self.classify_hate_harassment()
         elif message.content == "7":
+            self.report_category = State.CSAM
             return self.complete_report()
         else:
             self.state = State.INTELLECTUAL
+            self.report_category = State.INTELLECTUAL
             return self.classify_intellectual()
 
 
@@ -282,7 +297,7 @@ class Report:
 
         if self.state == State.AWAITING_BLOCK:
             self.reported_user = message.content.lower()
-            reply = "Please confirm that you would like to block '" + self.reported_user + "'\n"
+            reply = f"Please confirm that you would like to block `{self.reported_user}`.\n"
             reply += "You will no longer be able to interact with them.\n"
             reply += "Please reply with `yes` or `no`."
             self.state = State.AWAITING_BLOCK_CONFIRM
@@ -290,9 +305,9 @@ class Report:
         
         if self.state == State.AWAITING_BLOCK_CONFIRM:
             if message.content.lower() == "yes":
-                reply = "Thank you. User '" + self.reported_user + "' has been blocked."
+                reply = f"Thank you. `{self.reported_user}` has been blocked."
             else:
-                reply = "Thank you. User '" + self.reported_user + "' has not been blocked."
+                reply = f"Thank you. `{self.reported_user}` has not been blocked."
             self.state = State.BLOCK_COMPLETE
             return [reply]
 
