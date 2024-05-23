@@ -69,9 +69,6 @@ class ModBot(discord.Client):
                 author_warning_message = f"Warning: A potentially harmful link was detected in a message you sent.\n`{message.content}\n\n`"
                 author_warning_message += "Please be mindful of platform policies when sharing links."
                 await message.author.dm_channel.send(author_warning_message)
-        else:
-            warning_message = "No potentially harmful links detected."
-            await message.channel.send(warning_message)
 
     async def check_urls(self, urls):
         url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
