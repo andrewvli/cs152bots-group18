@@ -3,24 +3,9 @@ import discord
 import re
 import heapq
 
-class ReportState(Enum):
-    # Abuse Types
-    SPAM = auto()
-    HARM_ENDANGERMENT = auto()
-    SEXUALLY_EXPLICIT = auto()
-    FRAUD = auto()
-    FINANCIAL_FRAUD_CLASSIFICATION = auto()
-    MISINFORMATION = auto()
-    HATE_HARASSMENT = auto()
-    CSAM = auto()
-    INTELLECTUAL = auto()
-    ILLICIT_TRADE_SUBSTANCES = auto()
-
 class State(Enum):
     REVIEW_START = auto()
     REVIEWING_VIOLATION = auto()
-    REVIEWING_RECLASSIFICATION = auto()
-    RECLASSIFYING = auto()
     REVIEWING_NONVIOLATION = auto()
     REVIEWING_ADVERSARIAL_REPORTING = auto()
     REVIEWING_LEGALITY_DANGER = auto()
@@ -66,61 +51,9 @@ class Review:
                 self.state = State.REVIEWING_LEGALITY_DANGER
                 return [reply]
             else:
-                reply = "Does the data violate platform policies of any other category? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_RECLASSIFICATION
-                return [reply]
-            
-        if self.state == State.REVIEWING_RECLASSIFICATION:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = "What platform policy category does this content violate? Please select one the following options.\n"
-                reply += "1. Spam.\n"
-                reply += "2. Harm and endangerment.\n"
-                reply += "3. Nudity and sexual content.\n"
-                reply += "4. Fraud or scam.\n"
-                reply += "5. Misinformation.\n"
-                reply += "6. Hate and harassment.\n"
-                reply += "7. Sexual content involving a child.\n"
-                reply += "8. Intellectual property theft.\n"
-                reply += "9. Illicit trade and substances.\n"
-                self.state = State.RECLASSIFYING
-                return [reply]
-            else:
                 reply = "Do you suspect the content was reported maliciously? Please respond with `yes` or `no`."
                 self.state = State.REVIEWING_NONVIOLATION
                 return [reply]
-            
-        if self.state == State.RECLASSIFYING:
-            if message.content not in ["1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-                return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
-
-            if message.content == "1":
-                self.report.report_category = ReportState.SPAM
-            elif message.content == "2":
-                self.report.report_category = ReportState.HARM_ENDANGERMENT
-            elif message.content == "3":
-                self.report.report_category = ReportState.SEXUALLY_EXPLICIT
-            elif message.content == "4":
-                self.report.report_category = ReportState.FRAUD
-            elif message.content == "5":
-                self.report.report_category = ReportState.MISINFORMATION
-            elif message.content == "6":
-                self.report.report_category = ReportState.HATE_HARASSMENT
-            elif message.content == "7":
-                self.report.report_category = ReportState.CSAM
-            elif message.content == "8":
-                self.report.report_category = ReportState.INTELLECTUAL
-            else:
-                self.report.report_category = ReportState.ILLICIT_TRADE_SUBSTANCES
-            
-            await self.report.reported_message.delete()
-            reply = "The report has been reclassified, and violating content has been removed.\n"
-            reply += "Was the content illegal? Does the content pose an immediate danger? Please respond with `yes` or `no`."
-            self.state = State.REVIEWING_LEGALITY_DANGER
-            return [reply]
-
 
         if self.state == State.REVIEWING_NONVIOLATION:
             if message.content != "yes" and message.content != "no":
