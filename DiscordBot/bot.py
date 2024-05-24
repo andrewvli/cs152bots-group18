@@ -137,7 +137,7 @@ class ModBot(discord.Client):
             result = await self.check_urls(urls)
             if len(result) > 0:
                 print("result:", result)
-                warning_message = f"Warning: Potentially harmful link detected in the message\n`{message.content}`\n\n"
+                warning_message = f"Warning: Potentially harmful link detected in the message below.\n`{message.content}`\n\n"
                 warning_message += "Please be cautious!"
                 await message.channel.send(warning_message)
 
