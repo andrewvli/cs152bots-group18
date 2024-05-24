@@ -1,7 +1,10 @@
 from enum import Enum, auto
+import aiohttp
 import discord
 import re
 import heapq
+import json
+import os
 
 class State(Enum):
     REVIEW_START = auto()
@@ -17,6 +20,16 @@ class State(Enum):
     REVIEWING_ESCALATE = auto()
     REVIEW_COMPLETE = auto()
     REVIEW_ANOTHER = auto()
+
+# There should be a file called 'tokens.json' inside the same folder as this file
+token_path = 'tokens.json'
+if not os.path.isfile(token_path):
+    raise Exception(f"{token_path} not found!")
+with open(token_path) as f:
+    # If you get an error here, it means your token is formatted incorrectly. Did you put it in quotes?
+    tokens = json.load(f)
+    discord_token = tokens['discord']
+    google_apikey = tokens['google']
 
 class Review:
     START_KEYWORD = "review"
@@ -98,15 +111,23 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                if self.report.additional_details:
-                    reply = "The report contains these additional details.\n\n"
-                    reply += self.report.additional_details + "\n\n"
-                    reply += "Do the additional details contain any harmful links? Please respond with `yes` or `no`."
+                # if self.report.additional_details:
+                #     reply = "The report contains these additional details.\n\n"
+                #     reply += self.report.additional_details + "\n\n"
+                #     reply += "Do the additional details contain any harmful links? Please respond with `yes` or `no`."
+                #     self.state = State.REVIEWING_FRAUD_SCAM_2
+                #     return [reply]
+                # if not self.report.additional_details:
+                #     reply = f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
+                #     reply += self.prompt_new_review()
+                #     return [reply]
+                harmful_links = await self.find_urls()
+                if len(harmful_links) > 0:
+                    extracted_urls = await self.extract_harmful_urls(harmful_links)
+                    reply = "The reported messasge contains potentially harmful links.\n"
+                    reply += f"`{extracted_urls}\n`"
+                    reply += "Do the links need to be blacklisted? Please respond with `yes` or `no`."
                     self.state = State.REVIEWING_FRAUD_SCAM_2
-                    return [reply]
-                if not self.report.additional_details:
-                    reply = f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
-                    reply += self.prompt_new_review()
                     return [reply]
             else:
                 reply = "Was the reported message misleading or offensive? Please respond with `yes` or `no`."
@@ -118,8 +139,11 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                reply = "The harmful links have been blacklisted.\n"
-            reply += f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
+                reply = "The potentially harmful links have been blacklisted.\n"
+                reply += f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
+            else:
+                reply = "The potentially harmful links have not been blacklisted.\n"
+                reply += f"Reported user `{self.report.reported_user}` has been temporarily banned.\n\n"
             reply += self.prompt_new_review()
             return [reply]
 
@@ -201,3 +225,37 @@ class Review:
             self.state = State.REVIEW_ANOTHER
         
         return reply
+    
+    async def find_urls(self):
+        urls = re.findall(r'(https?://\S+)', self.report.reported_message.content)
+        result = await self.check_urls(urls)
+        return result
+    
+    async def check_urls(self, urls):
+        url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+        payload = {
+            'client': {
+                'clientId': "discord-bot",
+                'clientVersion': "0.1"
+            },
+            'threatInfo': {
+                'threatTypes': ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION", "THREAT_TYPE_UNSPECIFIED"],
+                'platformTypes': ["ANY_PLATFORM", "PLATFORM_TYPE_UNSPECIFIED", "WINDOWS", "LINUX", "ANDROID", "OSX", "IOS", "CHROME"],
+                'threatEntryTypes': ["URL", "THREAT_ENTRY_TYPE_UNSPECIFIED", "EXECUTABLE"],
+                'threatEntries': [{"url": u} for u in urls]
+            }
+        }
+        params = {'key': google_apikey} 
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, params=params, json=payload) as response:
+                result = await response.json()
+                return result
+            
+    async def extract_harmful_urls(self, api_response):
+        urls = set()  # Use a set to avoid duplicate URLs
+        if 'matches' in api_response:
+            for match in api_response['matches']:
+                url = match.get('threat', {}).get('url', '')
+                if url:  # Ensure the URL is not empty
+                    urls.add(url)
+        return list(urls)  # Convert the set back to a list if necessary

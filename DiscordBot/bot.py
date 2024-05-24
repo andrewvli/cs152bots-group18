@@ -6,11 +6,9 @@ import os
 import json
 import logging
 import re
-import requests
 import heapq
 from report import Report
 from mod import Review
-import pdb
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -136,19 +134,18 @@ class ModBot(discord.Client):
                     responses = await self.reviews[author_id].handle_review(message)
         else:
             urls = re.findall(r'(https?://\S+)', message.content)
-            print('urls:', urls)
             result = await self.check_urls(urls)
             if len(result) > 0:
-                    print("Potentially harmful link detected by Google Safe Browsing API.")
-                    warning_message = f"Warning: Potentially harmful link detected in the message\n`{message.content}`\n\n"
-                    warning_message += "Please be cautious!"
-                    await message.channel.send(warning_message)
+                print("result:", result)
+                warning_message = f"Warning: Potentially harmful link detected in the message\n`{message.content}`\n\n"
+                warning_message += "Please be cautious!"
+                await message.channel.send(warning_message)
 
-                    if message.author.dm_channel is None:
-                        await message.author.create_dm()
-                    author_warning_message = f"Warning: A potentially harmful link was detected in a message you sent.\n`{message.content}\n\n`"
-                    author_warning_message += "Please be mindful of platform policies when sharing links."
-                    await message.author.dm_channel.send(author_warning_message)
+                if message.author.dm_channel is None:
+                    await message.author.create_dm()
+                author_warning_message = f"Warning: A potentially harmful link was detected in a message you sent.\n`{message.content}\n\n`"
+                author_warning_message += "Please be mindful of platform policies when sharing links."
+                await message.author.dm_channel.send(author_warning_message)
 
 
         if responses: 
@@ -185,17 +182,16 @@ class ModBot(discord.Client):
                 'clientVersion': "0.1"
             },
             'threatInfo': {
-                'threatTypes': ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION", "THREAT_TYPE_UNSPECIFIED", "PHISHING"],
+                'threatTypes': ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION", "THREAT_TYPE_UNSPECIFIED"],
                 'platformTypes': ["ANY_PLATFORM", "PLATFORM_TYPE_UNSPECIFIED", "WINDOWS", "LINUX", "ANDROID", "OSX", "IOS", "CHROME"],
                 'threatEntryTypes': ["URL", "THREAT_ENTRY_TYPE_UNSPECIFIED", "EXECUTABLE"],
                 'threatEntries': [{"url": u} for u in urls]
             }
         }
-        params = {'key': google_apikey}  # Ensure you use self.google_apikey if it's stored in the class
+        params = {'key': google_apikey} 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, params=params, json=payload) as response:
                 result = await response.json()
-                print("result:", result)  # Print to debug
                 return result
 
 
