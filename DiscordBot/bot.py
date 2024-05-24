@@ -1,15 +1,16 @@
 # bot.py
 import discord
 from discord.ext import commands
-import os
+from googleapiclient import discovery
 import json
 import logging
-import re
-import requests
 import heapq
-from report import Report
 from mod import Review
+import os
 import pdb
+import re
+from report import Report
+import requests
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -26,7 +27,8 @@ with open(token_path) as f:
     # If you get an error here, it means your token is formatted incorrectly. Did you put it in quotes?
     tokens = json.load(f)
     discord_token = tokens['discord']
-
+    openai_key = tokens['openai']
+    google_key = tokens['google']
 
 class ModBot(discord.Client):
     def __init__(self): 
@@ -133,6 +135,9 @@ class ModBot(discord.Client):
             else: 
                 if author_id in self.reviews:
                     responses = await self.reviews[author_id].handle_review(message)
+        else:  # Message sent in general channel
+            violated_categories = await self.evaluate_perspective(message)
+            print('violated_categories:', violated_categories)
 
         if responses: 
             for r in responses:
@@ -160,6 +165,50 @@ class ModBot(discord.Client):
         '''
         return "Evaluated: '" + text+ "'"
 
+    async def evaluate_perspective(self, message):
+        client = discovery.build(
+            "commentanalyzer",
+            "v1alpha1",
+            developerKey=google_key,
+            discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+            static_discovery=False,
+        )
+
+        analyze_request = {
+            'comment': {'text': message.content},
+            'requestedAttributes': {
+                "TOXICITY": {},
+                "SEVERE_TOXICITY": {},
+                "IDENTITY_ATTACK": {},
+                "INSULT": {},
+                "PROFANITY": {},
+                "THREAT": {}
+            }
+        }
+
+        response = client.comments().analyze(body=analyze_request).execute()
+        threshold = 0.3  # Can change threshold
+        exceeds_threshold, categories = ModBot.check_evaluation_scores(response, threshold)
+        if exceeds_threshold:
+            print(f"Message exceeds threshold for: {categories}")
+        else:
+            print("No categories exceed the threshold.")
+        return categories
+
+    def check_evaluation_scores(response, threshold):
+        """
+        Check if any category in object returned by Google Perspective API call
+        exceeds given threshold
+        """
+        categories_exceeding_threshold = []
+        for attribute, details in response['attributeScores'].items():
+            if details['summaryScore']['value'] > threshold:
+                categories_exceeding_threshold.append(attribute)
+
+        if categories_exceeding_threshold:
+            return True, categories_exceeding_threshold
+        else:
+            return False, []
 
 client = ModBot()
 client.run(discord_token)
