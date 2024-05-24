@@ -111,16 +111,6 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                # if self.report.additional_details:
-                #     reply = "The report contains these additional details.\n\n"
-                #     reply += self.report.additional_details + "\n\n"
-                #     reply += "Do the additional details contain any harmful links? Please respond with `yes` or `no`."
-                #     self.state = State.REVIEWING_FRAUD_SCAM_2
-                #     return [reply]
-                # if not self.report.additional_details:
-                #     reply = f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
-                #     reply += self.prompt_new_review()
-                #     return [reply]
                 harmful_links = await self.find_urls()
                 if len(harmful_links) > 0:
                     extracted_urls = await self.extract_harmful_urls(harmful_links)
