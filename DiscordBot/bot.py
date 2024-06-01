@@ -27,6 +27,7 @@ if not os.path.isfile(token_path):
 with open(token_path) as f:
     tokens = json.load(f)
     discord_token = tokens['discord']
+    openai_key = tokens['openai']
 
 
 class ModBot(discord.Client):
@@ -35,7 +36,7 @@ class ModBot(discord.Client):
         intents.message_content = True
         super().__init__(command_prefix='.', intents=intents)
         self.openai = openai.OpenAI(
-            api_key='sample-api-key')
+            api_key=openai_key)
         self.group_num = None
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
         self.db_connection = sqlite3.connect('mod_db.sqlite')
