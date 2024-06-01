@@ -1,4 +1,3 @@
-# bot.py
 import discord
 from discord.ext import commands
 import os
@@ -6,6 +5,7 @@ import json
 import logging
 import re
 import requests
+from deep_translator import GoogleTranslator
 import heapq
 from report import Report
 from mod import Review
@@ -27,7 +27,6 @@ with open(token_path) as f:
     tokens = json.load(f)
     discord_token = tokens['discord']
 
-
 class ModBot(discord.Client):
     def __init__(self): 
         intents = discord.Intents.default()
@@ -38,6 +37,7 @@ class ModBot(discord.Client):
         self.reports = {} # Map from user IDs to the state of their report
         self.reviews = {}
         self.reports_to_review = []
+        self.translator = GoogleTranslator(source='auto', target='en') # Initialize the translator
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -68,15 +68,18 @@ class ModBot(discord.Client):
         if message.author.id == self.user.id:
             return
 
+        # Translate the message to English if needed
+        translated_message = self.translate_to_english(message.content)
+
         # Check if this message was sent in a server ("guild") or if it's a DM
         if message.guild:
-            await self.handle_channel_message(message)
+            await self.handle_channel_message(message, translated_message)
         else:
-            await self.handle_dm(message)
+            await self.handle_dm(message, translated_message)
 
-    async def handle_dm(self, message):
+    async def handle_dm(self, message, translated_message):
         # Handle a help message
-        if message.content == Report.HELP_KEYWORD:
+        if translated_message == Report.HELP_KEYWORD:
             reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `block` command to begin the blocking process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
@@ -92,7 +95,7 @@ class ModBot(discord.Client):
             self.reports[author_id] = Report(self)
 
         # Check command
-        command = message.content.split()[0]
+        command = translated_message.split()[0]
         if command == Report.START_KEYWORD:
             responses = await self.reports[author_id].handle_message(message)
         elif command == Report.BLOCK_KEYWORD:
@@ -116,7 +119,7 @@ class ModBot(discord.Client):
             self.reports.pop(author_id)
         
 
-    async def handle_channel_message(self, message):
+    async def handle_channel_message(self, message, translated_message):
         # Only handle messages sent in the "group-#" or "group-#-mod" channel
         if not message.channel.name == f'group-{self.group_num}' and not message.channel.name == f'group-{self.group_num}-mod':
             return
@@ -128,7 +131,7 @@ class ModBot(discord.Client):
             self.reviews[author_id] = Review(self)
             
         if message.channel.name == f'group-{self.group_num}-mod':
-            if message.content.split()[0] == Review.START_KEYWORD:
+            if translated_message.split()[0] == Review.START_KEYWORD:
                 responses = await self.reviews[author_id].handle_review(message)
             else: 
                 if author_id in self.reviews:
@@ -140,9 +143,19 @@ class ModBot(discord.Client):
 
         # Forward the message to the mod channel
         # mod_channel = self.mod_channels[message.guild.id]
-        # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-        # scores = self.eval_text(message.content)
+        # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{translated_message}"')
+        # scores = self.eval_text(translated_message)
         # await mod_channel.send(self.code_format(scores))
+
+    def translate_to_english(self, text):
+        try:
+            print('before text:', text)
+            translated_text = self.translator.translate(text)
+            print('after text:', translated_text)
+            return translated_text
+        except Exception as e:
+            logger.error(f"Translation error: {e}")
+            return text
     
     def eval_text(self, message):
         ''''
@@ -158,7 +171,7 @@ class ModBot(discord.Client):
         evaluated, insert your code here for formatting the string to be 
         shown in the mod channel. 
         '''
-        return "Evaluated: '" + text+ "'"
+        return "Evaluated: '" + text + "'"
 
 
 client = ModBot()
