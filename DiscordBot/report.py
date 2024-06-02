@@ -411,8 +411,8 @@ class Report:
         if message.content == self.CANCEL_KEYWORD:
             self.state = State.BLOCK_COMPLETE
 
-        if message.content.startswith(self.START_KEYWORD):
-            return await self.handle_message(message)
+        # if message.content.startswith(self.START_KEYWORD):
+        #     return await self.handle_message(message)
 
         if message.content.startswith(self.BLOCK_KEYWORD):
             self.state = State.BLOCK_START
@@ -421,6 +421,7 @@ class Report:
             reply += "Please copy paste the username of the user you want to block.\n"
             reply += "You can obtain this by right-clicking the user, clicking `Profile,` and copying the username."
             self.state = State.AWAITING_BLOCK
+            self.time_reported = datetime.now()
             return [reply]
 
         if self.state == State.AWAITING_BLOCK:

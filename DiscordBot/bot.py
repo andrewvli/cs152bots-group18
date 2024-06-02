@@ -102,31 +102,22 @@ class ModBot(discord.Client):
 
         author_id = message.author.id
         responses = []
-        automated-perspective
+
+        # Only respond to messages if they're part of a reporting flow
+        if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD) and not message.content.startswith(Report.BLOCK_KEYWORD):
+            return
 
         # If we don't currently have an active report for this user, add one
         if author_id not in self.reports:
             self.reports[author_id] = Report(self)
 
+
         # Check command
         command = message.content.split()[0]
-        if command == Report.START_KEYWORD:
+        if command == Report.START_KEYWORD or command == Report.BLOCK_KEYWORD:
             responses = await self.reports[author_id].handle_message(message)
-        elif command == Report.BLOCK_KEYWORD:
-            responses = await self.reports[author_id].handle_block(message)
-        else:
-            if author_id in self.reports:
-                responses = await self.reports[author_id].handle_message(message)
-                blocks = await self.reports[author_id].handle_block(message)
-                responses.extend(blocks)
-
-        # Send all responses
-        if responses:
-            for r in responses:
-                await message.channel.send(r)
-
-        # If the report/block is complete or cancelled, remove it from our map
-        if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
+        elif self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
+            # If the report/block is complete or cancelled, remove it from our map
             heapq.heappush(self.reports_to_review,
                            (self.reports[author_id].priority, self.reports[author_id]))
             blocks = await self.reports[author_id].handle_block(message)
@@ -135,17 +126,15 @@ class ModBot(discord.Client):
             if author_id in self.reports:
                 responses = await self.reports[author_id].handle_message(message)
                 blocks = await self.reports[author_id].handle_block(message)
+                responses.extend(blocks)
 
-        if responses: 
-            for r in responses:
-                await message.channel.send(r)
-        if blocks:
-            for b in blocks:
-                await message.channel.send(b)
+        for r in responses:
+            await message.channel.send(r)
 
         # If the report/block is complete or cancelled, remove it from our map
         if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
-            heapq.heappush(self.reports_to_review, (self.reports[author_id].priority, self.reports[author_id]))
+            if (self.reports[author_id].report_complete()):
+                heapq.heappush(self.reports_to_review, (self.reports[author_id].priority, self.reports[author_id]))
             self.reports.pop(author_id)
         
 
