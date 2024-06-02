@@ -63,7 +63,7 @@ class ModBot(discord.Client):
                 time_reported TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        self.db_connection.commit()
+        self.db_connection.commit()      
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -94,7 +94,7 @@ class ModBot(discord.Client):
 
     async def handle_dm(self, message):
         if message.content == Report.HELP_KEYWORD:
-            reply = "Use the `report` command to begin the reporting process.\n"
+            reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `block` command to begin the blocking process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
             await message.channel.send(reply)
@@ -102,6 +102,7 @@ class ModBot(discord.Client):
 
         author_id = message.author.id
         responses = []
+        automated-perspective
 
         # If we don't currently have an active report for this user, add one
         if author_id not in self.reports:
@@ -128,7 +129,25 @@ class ModBot(discord.Client):
         if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
             heapq.heappush(self.reports_to_review,
                            (self.reports[author_id].priority, self.reports[author_id]))
+            blocks = await self.reports[author_id].handle_block(message)
+        else:
+            # If it's neither, it might still be in the middle of an ongoing report/block process
+            if author_id in self.reports:
+                responses = await self.reports[author_id].handle_message(message)
+                blocks = await self.reports[author_id].handle_block(message)
+
+        if responses: 
+            for r in responses:
+                await message.channel.send(r)
+        if blocks:
+            for b in blocks:
+                await message.channel.send(b)
+
+        # If the report/block is complete or cancelled, remove it from our map
+        if self.reports[author_id].report_complete() or self.reports[author_id].block_complete():
+            heapq.heappush(self.reports_to_review, (self.reports[author_id].priority, self.reports[author_id]))
             self.reports.pop(author_id)
+        
 
     async def handle_start_report(self, message):
         author_id = message.author.id
@@ -149,8 +168,9 @@ class ModBot(discord.Client):
         return responses
 
     async def handle_channel_message(self, message):
-        if not (message.channel.name == f'group-{self.group_num}' or message.channel.name == f'group-{self.group_num}-mod'):
-            return
+        # Only handle messages sent in the "group-#" or "group-#-mod" channel
+        if not message.channel.name == f'group-{self.group_num}' and not message.channel.name == f'group-{self.group_num}-mod':
+            return             
 
         author_id = message.author.id
         responses = []
@@ -290,7 +310,6 @@ class ModBot(discord.Client):
         )
 
         await self.generate_report(message, openai_flag_type, perspective_flag_types)
-
 
 client = ModBot()
 client.run(discord_token)
