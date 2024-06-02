@@ -8,7 +8,7 @@ class ReportState(Enum):
     SPAM = auto()
     HARM_ENDANGERMENT = auto()
     SEXUALLY_EXPLICIT = auto()
-    FRAUD = auto()
+    FRAUD_SCAM = auto()
     FINANCIAL_FRAUD_CLASSIFICATION = auto()
     MISINFORMATION = auto()
     HATE_HARASSMENT = auto()
@@ -19,19 +19,40 @@ class ReportState(Enum):
 class State(Enum):
     REVIEW_START = auto()
     REVIEWING_VIOLATION = auto()
+    # REVIEWING_RECLASSIFICATION = auto()
+    # RECLASSIFYING = auto()
+    # REVIEWING_NONVIOLATION = auto()
+    # REVIEWING_ADVERSARIAL_REPORTING = auto()
+    # REVIEWING_LEGALITY_DANGER = auto()
+    # REVIEWING_FRAUD_SCAM_1 = auto()
+    # REVIEWING_FRAUD_SCAM_2 = auto()
+    # REVIEWING_MISLEADING_OFFENSIVE_1 = auto()
+    # REVIEWING_MISLEADING_OFFENSIVE_2 = auto()
+    # REVIEWING_FURTHER = auto()
+    # REVIEWING_ESCALATE = auto()
+    # REVIEW_COMPLETE = auto()
+    # REVIEW_ANOTHER = auto()
+    REVIEWING_CLASSIFICATION = auto()
     REVIEWING_RECLASSIFICATION = auto()
-    RECLASSIFYING = auto()
+    REVIEWING_CATEGORY = auto()
     REVIEWING_NONVIOLATION = auto()
-    REVIEWING_ADVERSARIAL_REPORTING = auto()
-    REVIEWING_LEGALITY_DANGER = auto()
-    REVIEWING_FRAUD_SCAM_1 = auto()
+    REVIEWING_SPAM = auto()
+    REVIEWING_SPAM_2 = auto()
+    REVIEWING_HARM_ENDANGERMENT = auto()
+    REVIEWING_SEXUALLY_EXPLICIT = auto()
+    REVIEWING_FRAUD_SCAM = auto()
     REVIEWING_FRAUD_SCAM_2 = auto()
-    REVIEWING_MISLEADING_OFFENSIVE_1 = auto()
-    REVIEWING_MISLEADING_OFFENSIVE_2 = auto()
-    REVIEWING_FURTHER = auto()
-    REVIEWING_ESCALATE = auto()
-    REVIEW_COMPLETE = auto()
-    REVIEW_ANOTHER = auto()
+    REVIEWING_FINANCIAL = auto()
+    REVIEWING_LINKS = auto()
+    REVIEWING_MISINFORMATION = auto()
+    REVIEWING_MISINFORMATION_2 = auto()
+    REVIEWING_HATE_HARASSMENT = auto()
+    REVIEWING_HATE_HARASSMENT_2 = auto()
+    REVIEWING_CSAM = auto()
+    REVIEWING_INTELLECTUAL = auto()
+    REVIEWING_ILLICIT = auto()
+    REVIEWING_FURTHER_ACTION = auto()
+    REVIEWING_FURTHER_ACTION_2 = auto()
 
 class Review:
     START_KEYWORD = "review"
@@ -61,184 +82,258 @@ class Review:
             
             if message.content == "yes":
                 await self.report.reported_message.delete()
-                reply = "Violating content has been removed.\n"
-                reply += "Was the content illegal? Does the content pose an immediate danger? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_LEGALITY_DANGER
-                return [reply]
-            else:
-                reply = "Does the data violate platform policies of any other category? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_RECLASSIFICATION
-                return [reply]
-            
-        if self.state == State.REVIEWING_RECLASSIFICATION:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = "What platform policy category does this content violate? Please select one the following options.\n"
-                reply += "1. Spam.\n"
-                reply += "2. Harm and endangerment.\n"
-                reply += "3. Nudity and sexual content.\n"
-                reply += "4. Fraud or scam.\n"
-                reply += "5. Misinformation.\n"
-                reply += "6. Hate and harassment.\n"
-                reply += "7. Sexual content involving a child.\n"
-                reply += "8. Intellectual property theft.\n"
-                reply += "9. Illicit trade and substances.\n"
-                self.state = State.RECLASSIFYING
-                return [reply]
-            else:
-                reply = "Do you suspect the content was reported maliciously? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_NONVIOLATION
-                return [reply]
-            
-        if self.state == State.RECLASSIFYING:
-            if message.content not in ["1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-                return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
-
-            if message.content == "1":
-                self.report.report_category = ReportState.SPAM
-            elif message.content == "2":
-                self.report.report_category = ReportState.HARM_ENDANGERMENT
-            elif message.content == "3":
-                self.report.report_category = ReportState.SEXUALLY_EXPLICIT
-            elif message.content == "4":
-                self.report.report_category = ReportState.FRAUD
-            elif message.content == "5":
-                self.report.report_category = ReportState.MISINFORMATION
-            elif message.content == "6":
-                self.report.report_category = ReportState.HATE_HARASSMENT
-            elif message.content == "7":
-                self.report.report_category = ReportState.CSAM
-            elif message.content == "8":
-                self.report.report_category = ReportState.INTELLECTUAL
-            else:
-                self.report.report_category = ReportState.ILLICIT_TRADE_SUBSTANCES
-            
-            await self.report.reported_message.delete()
-            reply = "The report has been reclassified, and violating content has been removed.\n"
-            reply += "Was the content illegal? Does the content pose an immediate danger? Please respond with `yes` or `no`."
-            self.state = State.REVIEWING_LEGALITY_DANGER
-            return [reply]
-
-
-        if self.state == State.REVIEWING_NONVIOLATION:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-
-            if message.content == "yes":
-                reply = "Do you suspect there was coordinated reporting from multiple actors? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_ADVERSARIAL_REPORTING
-            else:
-                reply = "Thank you. No further action will be taken.\n\n"
-                reply += self.prompt_new_review()
-            return [reply]
-
-        if self.state == State.REVIEWING_ADVERSARIAL_REPORTING:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = f"Reported user `{self.report.reported_user}` has been temporarily banned.\n"
-                reply += "This report will be escalated to higher moderation teams for further review.\n\n"
-            else:
-                reply = f"Reported user `{self.report.reported_user}` has been temporarily banned.\n"
-            reply += self.prompt_new_review()
-            return [reply]
-            
-        if self.state == State.REVIEWING_LEGALITY_DANGER:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = "This message will be submitted to local authorities.\n"
-                reply += f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
+                reply = "The violating content has been removed.\n"
+                # self.State = State.REVIEWING_FURTHER_ACTION 
                 reply += self.prompt_new_review()
                 return [reply]
             else:
-                reply = "Did the reported message violate policies on fraud or scam? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_FRAUD_SCAM_1
-                return [reply]
-
-        if self.state == State.REVIEWING_FRAUD_SCAM_1:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
+                self.State == State.REVIEWING_RECLASSIFICATION
             
-            if message.content == "yes":
-                if self.report.additional_details:
-                    reply = "The report contains these additional details.\n\n"
-                    reply += self.report.additional_details + "\n\n"
-                    reply += "Do the additional details contain any harmful links? Please respond with `yes` or `no`."
-                    self.state = State.REVIEWING_FRAUD_SCAM_2
+                if self.State == State.REVIEWING_CLASSIFICATION:
+                    reply = "Does this content violate platform policies? Please respond with `yes` or `no`."
+                    self.State = State.REVIEWING_RECLASSIFICATION
                     return [reply]
-                if not self.report.additional_details:
-                    reply = f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
-                    reply += self.prompt_new_review()
+                    
+                if self.State == State.REVIEWING_RECLASSIFICATION:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+
+                    if message.content == "yes":
+                        await self.report.reported_message.delete()
+                        reply = "The violating content has been removed.\n"
+                        reply += "Which category best describes the nature of this violation? Please respond with one of the following options.\n"
+                        reply += "1. Spam.\n"
+                        reply += "2. Harm and endangerment.\n"
+                        reply += "3. Nudity and sexual content.\n"
+                        reply += "4. Fraud or scam.\n"
+                        reply += "5. Misinformation.\n"
+                        reply += "6. Hate and harassment.\n"
+                        reply += "7. Sexual content involving a child.\n"
+                        reply += "8. Intellectual property theft.\n"
+                        reply += "9. Illicit trade and substances.\n"
+                        self.State = State.REVIEWING_CATEGORY
+                        return [reply]
+                    else:
+                        reply = "Does it seem like this content was reported with malicious intent? Please respond with `yes` or `no`."
+                        self.State = State.REVIEWING_NONVIOLATION
+                        return [reply]
+                
+                if self.state == State.REVIEWING_RECLASSIFICATION:
+                    if message.content not in ["1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate category for reporting this message, or say `cancel` to cancel."]
+                    
+                    if message.content == "1":
+                        self.report.report_category = ReportState.SPAM
+                        self.State = State.REVIEWING_SPAM
+                        return [reply]
+                    if message.content == "2":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Self-harm or suicidal content.\n"
+                        reply += "2. Terrorism.\n"
+                        reply += "3. Threat or depictions of violence and abuse.\n"
+                        reply += "4. Death or severe injury.\n"
+                        self.report.report_category = ReportState.HARM_ENDANGERMENT
+                        self.State = State.REVIEWING_HARM_ENDANGERMENT
+                        return [reply]
+                    if message.content == "3":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Adult nudity or pornography.\n"
+                        reply += "2. Sexual harassment or abuse.\n"
+                        self.report.report_category = ReportState.SEXUALLY_EXPLICIT
+                        self.State = State.REVIEWING_SEXUALLY_EXPLICIT
+                        return [reply]
+                    if message.content == "4":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Impersonation.\n"
+                        reply += "2. Romance.\n"
+                        reply += "3. Financial.\n"
+                        self.report.report_category = ReportState.FRAUD_SCAM
+                        self.State = State.REVIEWING_FRAUD_SCAM
+                        return [reply]
+                    if message.content == "5":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Health.\n"
+                        reply += "2. Climate.\n"
+                        reply += "3. Political.\n"
+                        self.report.report_category = ReportState.MISINFORMATION
+                        self.State = State.REVIEWING_MISINFORMATION
+                        return [reply]
+                    if message.content == "6":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Bullying.\n"
+                        reply += "2. Reviewing private information.\n"
+                        reply += "3. Hate speech.\n"
+                        reply += "4. Stalking.\n"
+                        self.report.report_category = ReportState.HATE_HARASSMENT
+                        self.State = State.REVIEWING_HATE_HARASSMENT
+                        return [reply]
+                    if message.content == "7":
+                        self.report.report_category = ReportState.CSAM
+                        self.State = State.REVIEWING_CSAM
+                        return [reply]
+                    if message.content == "8":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Infringes my copyright.\n"
+                        reply += "2. Infringes my trademark.\n"
+                        self.report.report_category = ReportState.INTELLECTUAL
+                        self.State = State.REVIEWING_INTELLECTUAL
+                        return [reply]
+                    if message.content == "9":
+                        reply = "Which subcategory best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Illegal drug use or sale.\n"
+                        reply += "2. Sale or promotion of counterfeit goods.\n"
+                        reply += "3. Black market and smuuggling.\n"
+                        self.report.report_category = ReportState.ILLICIT_TRADE_SUBSTANCES
+                        self.State = State.REVIEWING_ILLICIT
+                        return [reply]
+                
+                if self.State == State.REVIEWING_SPAM:
+                    reply = "Does the reported user have a history of violation? Please respond with `yes` or `no`."
+                    self.State = State.REVIEWING_SPAM_2
                     return [reply]
-            else:
-                reply = "Was the reported message misleading or offensive? Please respond with `yes` or `no`."
-                self.state = State.REVIEWING_MISLEADING_OFFENSIVE_1
+                if self.State == State.REVIEWING_SPAM_2:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+                    if message.content == "yes":
+                        reply = "The reported user has been permanently banned.\n"
+                    else:
+                        reply = "The reported user has been temporarily banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_HARM_ENDANGERMENT:
+                    if message.content not in ["1", "2", "3", "4"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    else:
+                        reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+                        self.State = State.REVIEWING_FURTHER_ACTION
+                        return [reply]
+                    
+                if self.State == State.REVIEWING_SEXUALLY_EXPLICIT:
+                    if message.content not in ["1", "2"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    if message.content == "1":
+                        reply = "The reported user has been permanently banned.\n"
+                    if message.content == "2":
+                        reply = reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_FRAUD_SCAM:
+                    if message.content not in ["1", "2", "3"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    if message.content in ["1", "2"]:
+                        reply = "Does the reported user have a history of violation? Please respond with `yes` or `no`.\n"
+                        self.State = State.REVIEWING_FRAUD_SCAM_2
+                    if message.content == "3":
+                        reply = "Which subcategory of financial fraud best describes the nature of this content? Please respond with one of the following options.\n"
+                        reply += "1. Cryptocurrency.\n"
+                        reply += "2. Investment.\n"
+                        reply += "3. Phishing.\n"
+                        reply += "4. Credit card.\n"
+                        self.State = State.REVIEWING_FINANCIAL
+                if self.State == State.REVIEWING_FRAUD_SCAM_2:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+                    if message.content == "yes":
+                        reply = "The reported user has been permanently banned.\n"
+                    else:
+                        reply = "The reported user has been temporarily banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                if self.State == State.REVIEWING_FINANCIAL:
+                    reply = "Does the reported message contain any harmful links? Please respond with `yes` or `no`.\n"
+                    self.State = State.REVIEWING_LINKS
+                    return [reply]
+                if self.State == State.REVIEWING_LINKS:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+                    if message.content == "yes":
+                        reply = "The harmful links have been blacklisted.\n"
+                    reply += "The reported user has been permanently banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_MISINFORMATION:
+                    if message.content not in ["1", "2", "3"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    else:
+                        reply = "Does the reported user have a history of violation? Please respond with `yes` or `no`.\n"
+                        self.State = State.REVIEWING_MISINFORMATION_2
+                        return [reply]
+                if self.State == State.REVIEWING_MISINFORMATION_2:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+                    if message.content == "yes":
+                        reply = "The reported user has been flagged.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_HATE_HARASSMENT:
+                    if message.content not in ["1", "2", "3", "4"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    else:
+                        reply = "Does the reported user have a history of violation? Please respond with `yes` or `no`.\n"
+                        self.State = State.REVIEWING_HATE_HARASSMENT_2
+                        return [reply]
+                if self.State == State.REVIEWING_HATE_HARASSMENT_2:
+                    if message.content != "yes" and message.content != "no":
+                        return ["Please respond with `yes` or `no`."]
+                    if message.content == "yes":
+                        reply = "The reported user has been permanently banned.\n"
+                    else:
+                        reply = "The reported user has been temporarily banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_CSAM:
+                    reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+                    self.State = State.REVIEWING_FURTHER_ACTION
+                    return [reply]
+                
+                if self.State == State.REVIEWING_INTELLECTUAL:
+                    if message.content not in ["1", "2"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    else:
+                        self.State = State.REVIEWING_FURTHER_ACTION
+                
+                if self.State == State.REVIEWING_ILLICIT:
+                    if message.content not in ["1", "2", "3"]:
+                        return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
+                    if message.content in ["1", "2"]:
+                        self.State = State.REVIEWING_FURTHER_ACTION
+                        return
+                    if message.content == "3":
+                        reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+                        self.State = State.REVIEWING_FURTHER_ACTION
+                        return [reply]
+                
+            
+            if self.State == State.REVIEWING_FURTHER_ACTION:
+                reply = "Is further action necessary to review this report? Plese respond with `yes` or `no`.\n"
+                self.State = State.REVIEWING_FURTHER_ACTION_2
+                return [reply]
+            if self.State == State.REVIEWING_FURTHER_ACTION_2:
+                if message.content != "yes" and message.content != "no":
+                    return ["Please respond with `yes` or `no`."]
+                if message.content == "yes":
+                    reply = "This report will be escalated to a higher moderation team for additional review.\n"
+                else:
+                    "No further action will be taken.\n"
+                reply += self.prompt_new_review()
                 return [reply]
 
-        if self.state == State.REVIEWING_FRAUD_SCAM_2:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = "The harmful links have been blacklisted.\n"
-            reply += f"Reported user `{self.report.reported_user}` has been permanently banned.\n\n"
-            reply += self.prompt_new_review()
-            return [reply]
-
-        if self.state == State.REVIEWING_MISLEADING_OFFENSIVE_1:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-
-            if message.content == "yes":
-                reply = "Does the user have a history of violation?\n"
-                reply += "Please respond with `yes` or `no`."
-                self.state =  State.REVIEWING_MISLEADING_OFFENSIVE_2
-                return [reply]
-            else:
-                reply = "The report has not been classified into any existing categories.\n"
-                reply += "Please provide details about your review.\n\n"
-                self.state = State.REVIEWING_FURTHER
+            if self.State == State.REVIEWING_NONVIOLATION:
+                if message.content != "yes" and message.content != "no":
+                    return ["Please respond with `yes` or `no`."]
+                
+                if message.content == "yes":
+                    reply = "The reporting user has been temporarily banned."
+                if message.content == "no":
+                    reply = "No further action will be taken."
+                reply += self.prompt_new_review()
                 return [reply]
 
-        if self.state == State.REVIEWING_MISLEADING_OFFENSIVE_2:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            if message.content == "yes":
-                reply = f"Reported user `{self.report.reported_user}` has been flagged.\n\n"
-            else:
-                reply = f"Reported user `{self.report.reported_user}` has been warned.\n\n"
-            reply += self.prompt_new_review()
-            return [reply]
-
-        if self.state == State.REVIEWING_FURTHER:
-            reply = "Thank you for providing details about your review.\n\n"
-            reply += "Is further action necessary to review the violating content? Please respond with `yes` or `no`.\n\n"
-            self.state = State.REVIEWING_ESCALATE
-            return [reply]
-
-        if self.state == State.REVIEWING_ESCALATE:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-
-            if message.content == "yes":
-                reply = "Thank you. This report will be escalated to a higher moderation team for further review.\n\n"
-            else:
-                reply = "Thank you. No further action will be taken.\n\n"
-            reply += self.prompt_new_review()
-            return [reply]
-
-        if self.state == State.REVIEW_ANOTHER:
-            if message.content != "yes" and message.content != "no":
-                return ["Please respond with `yes` or `no`."]
-            
-            return [self.start_review()]
-            
         return []
 
 
@@ -253,7 +348,8 @@ class Review:
         reply += f"Report subcategory: {self.report.report_subcategory}\n"
         reply += f"Additional details filed by reporting: {self.report.additional_details}\n\n"
 
-        reply += f"Is this in violation of platform policies? Please respond with `yes` or `no`."
+        # reply += f"Is this in violation of platform policies? Please respond with `yes` or `no`."
+        reply += "Is this classification correct? Please respond with `yes` or `no`.\n"
         self.state = State.REVIEWING_VIOLATION
         return reply
     
