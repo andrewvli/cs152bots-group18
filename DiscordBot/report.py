@@ -451,8 +451,8 @@ class Report:
             "reportee": self.reportee,
             "reported_user": self.reported_user,
             "reported_message": self.reported_message,
-            "report_category": self.report_category.name if self.report_category else None,
-            "report_subcategory": self.report_subcategory.name if self.report_subcategory else None,
+            "report_category": self.report_category,  # Directly use as string
+            "report_subcategory": self.report_subcategory,  # Directly use as string
             "additional_details": self.additional_details,
             "priority": self.priority,
             "report_status": self.report_status,
@@ -463,11 +463,11 @@ class Report:
             logger.debug(f"Saving report to DB: {report_data}")
             db_cursor.execute('''
                 INSERT INTO reports (reported_user_id, reporter_user_id, reportee, reported_user, reported_message, 
-                                     report_category, report_subcategory, additional_details, priority, report_status, time_reported)
+                                    report_category, report_subcategory, additional_details, priority, report_status, time_reported)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (report_data["reported_user_id"], report_data["reporter_user_id"], report_data["reportee"], report_data["reported_user"],
-                  report_data["reported_message"], report_data["report_category"], report_data["report_subcategory"],
-                  report_data["additional_details"], report_data["priority"], report_data["report_status"], report_data["time_reported"]))
+                report_data["reported_message"], report_data["report_category"], report_data["report_subcategory"],
+                report_data["additional_details"], report_data["priority"], report_data["report_status"], report_data["time_reported"]))
             db_connection.commit()
         except Exception as e:
             logger.error(f"Failed to save the report to the database: {e}")

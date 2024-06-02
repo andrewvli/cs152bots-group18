@@ -7,6 +7,7 @@ import re
 import openai
 import sqlite3
 from datetime import datetime
+from googleapiclient import discovery
 from report import Report
 from mod import Review
 import heapq
@@ -28,6 +29,7 @@ with open(token_path) as f:
     tokens = json.load(f)
     discord_token = tokens['discord']
     openai_key = tokens['openai']
+    google_key = tokens['google']
 
 
 class ModBot(discord.Client):
@@ -35,8 +37,7 @@ class ModBot(discord.Client):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix='.', intents=intents)
-        self.openai = openai.OpenAI(
-            api_key=openai_key)
+        self.openai = openai.OpenAI(api_key=openai_key)
         self.group_num = None
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
         self.db_connection = sqlite3.connect('mod_db.sqlite')
@@ -162,9 +163,11 @@ class ModBot(discord.Client):
             elif author_id in self.reviews:
                 responses = await self.reviews[author_id].handle_review(message)
         else:
-            flag_type = await self.evaluate_message(message.content)
-            if flag_type:
-                await self.handle_offensive_message(message, flag_type)
+            openai_flag_type = await self.evaluate_message_openai(message.content)
+            perspective_flag_types = await self.evaluate_message_perspective(message.content)
+
+            if openai_flag_type or perspective_flag_types:
+                await self.handle_offensive_message(message, openai_flag_type, perspective_flag_types)
             else:
                 mod_channel = self.mod_channels[message.guild.id]
                 await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
@@ -173,13 +176,7 @@ class ModBot(discord.Client):
             for r in responses:
                 await message.channel.send(r)
 
-    def eval_text(self, message):
-        return message
-
-    def code_format(self, text):
-        return "Evaluated: '" + text + "'"
-
-    async def evaluate_message(self, message_content):
+    async def evaluate_message_openai(self, message_content):
         response = self.openai.moderations.create(input=message_content)
         output = response.results[0]
 
@@ -194,26 +191,71 @@ class ModBot(discord.Client):
                 return flagged_categories[0]
         return None
 
-    async def generate_report(self, message, flag_type):
+    async def evaluate_message_perspective(self, message_content):
+        client = discovery.build(
+            "commentanalyzer",
+            "v1alpha1",
+            developerKey=google_key,
+            discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+            static_discovery=False,
+        )
+
+        analyze_request = {
+            'comment': {'text': message_content},
+            'requestedAttributes': {
+                "TOXICITY": {},
+                "SEVERE_TOXICITY": {},
+                "IDENTITY_ATTACK": {},
+                "INSULT": {},
+                "PROFANITY": {},
+                "THREAT": {}
+            }
+        }
+
+        response = client.comments().analyze(body=analyze_request).execute()
+        threshold = 0.3  # Can change threshold
+        exceeds_threshold, categories = self.check_evaluation_scores(response, threshold)
+        if exceeds_threshold:
+            print(f"Message exceeds threshold for: {categories}")
+        else:
+            print("No categories exceed the threshold.")
+        return categories
+
+    @staticmethod
+    def check_evaluation_scores(response, threshold):
+        categories_exceeding_threshold = []
+        for attribute, details in response['attributeScores'].items():
+            if details['summaryScore']['value'] > threshold:
+                categories_exceeding_threshold.append(attribute)
+
+        if categories_exceeding_threshold:
+            return True, categories_exceeding_threshold
+        else:
+            return False, []
+
+    async def generate_report(self, message, openai_flag_type, perspective_flag_types):
         report = Report(self)
         report.reported_user_id = message.author.id
-        report.report_category = flag_type.upper()
         report.reportee = "System"
         report.reporter_user_id = self.user.id
         report.reported_user = message.author.name
         report.reported_message = message.content
         report.time_reported = datetime.now()
-        report.additional_details = "Flagged by OpenAI"
-        report.report_subcategory = "N/A"  # TODO: Add subcategory to report
+        
+        additional_details = []
+        if openai_flag_type:
+            additional_details.append("Flagged by OpenAI")
+        if perspective_flag_types:
+            additional_details.append("Flagged by Google Perspective")
+
+        report.additional_details = ", ".join(additional_details)
+        report.report_category = openai_flag_type or (perspective_flag_types[0] if perspective_flag_types else "Unknown")
+        report.report_subcategory = "N/A"  # Set as string
         report.report_status = "pending"
 
         # set priority based on flag type
-        # Flag types from OpenAI: ['hate, hate/threatening, harassment,
-        # harassment/threatening, harassment/threatening, self-harm,
-        # self-harm/intent, self-harm/instructions
-        # sexual, sexual/minors, violence, violence/graphic
-
-        if flag_type == 'hate/threatening' or flag_type == 'harassment/threatening' or flag_type == 'self-harm/intent' or flag_type == 'sexual/minors' or flag_type == 'violence/graphic' or flag_type == "self-harm/intent" or flag_type == "self-harm/instructions" or flag_type == "violence" or flag_type == "violence/graphic":
+        if openai_flag_type in ['hate/threatening', 'harassment/threatening', 'self-harm/intent', 'sexual/minors', 'violence/graphic'] or \
+        any(pt in ['SEVERE_TOXICITY', 'THREAT', 'IDENTITY_ATTACK'] for pt in perspective_flag_types):
             report.priority = 1
         else:
             report.priority = 2
@@ -225,23 +267,29 @@ class ModBot(discord.Client):
             await mod_channel.send(
                 f"🚩 **Report Generated** 🚩\n"
                 f"**User:** {message.author.name}\n"
-                f"**Reason:** {flag_type}\n"
+                f"**Reason:** {openai_flag_type or ', '.join(perspective_flag_types)}\n"
                 f"**Message:** {message.content}\n"
-                f"**Time:** {report.time_reported.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"**Time:** {report.time_reported.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"**Details:** {report.additional_details}"
             )
         else:
             logger.warning("No mod channel found for the guild.")
         report.save_report(self.db_cursor, self.db_connection)
 
-    async def handle_offensive_message(self, message, flag_type):
-        await message.delete()
+
+    async def handle_offensive_message(self, message, openai_flag_type, perspective_flag_types):
+        try:
+            await message.delete()
+        except discord.errors.NotFound:
+            logger.warning(f"Message {message.id} already deleted.")
 
         await message.author.send(
-            f"Your message in {message.channel.name} was removed because it was flagged as {flag_type}. "
+            f"Your message in {message.channel.name} was removed because it was flagged as "
+            f"{openai_flag_type or ', '.join(perspective_flag_types)}. "
             "Please be mindful of the community guidelines."
         )
 
-        await self.generate_report(message, flag_type)
+        await self.generate_report(message, openai_flag_type, perspective_flag_types)
 
 
 client = ModBot()
