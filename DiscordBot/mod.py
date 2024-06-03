@@ -3,6 +3,7 @@ import logging
 import discord
 from report import Report
 import sqlite3
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -224,8 +225,8 @@ class Review:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             else:
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-                reply += await self.prompt_new_review()
                 self.mark_report_resolved()
+                reply += await self.prompt_new_review()
                 return [reply]
                     
         if self.state == State.REVIEWING_SEXUALLY_EXPLICIT:
@@ -239,8 +240,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             if message.content == "2":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_FRAUD_SCAM:
@@ -274,8 +275,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
 
         if self.state == State.REVIEWING_FINANCIAL:
@@ -292,11 +293,16 @@ class Review:
             if message.content != "yes" and message.content != "no":
                 return ["Please respond with `yes` or `no`."]
             reply = ""
+
             if message.content == "yes":
+                urls = re.findall(r'(https?://\S+)', self.report.reported_message.content)
+                for url in urls:
+                    self.blacklist_link(url)
                 reply += "The harmful links have been blacklisted.\n"
+            
             reply += "The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_MISINFORMATION:
@@ -320,8 +326,8 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
                 reply = "The reported user has been flagged.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_HATE_HARASSMENT:
@@ -347,13 +353,14 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_CSAM:
             logger.debug("State: REVIEWING_CSAM")
             reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+            self.mark_report_resolved()
             reply += await self.prompt_new_review()
             return [reply]
                 
@@ -365,8 +372,8 @@ class Review:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             reply = "The reported user has been flagged.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_ILLICIT:
@@ -380,8 +387,8 @@ class Review:
                 reply = "The reported user has been flagged.\n"
             if message.content == "3":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_FURTHER_ACTION:            
@@ -396,8 +403,8 @@ class Review:
                 reply = "This report will be escalated to a higher moderation team for additional review.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
 
         if self.state == State.REVIEWING_NONVIOLATION:
@@ -412,8 +419,8 @@ class Review:
                 reply = "The reporting user has been permanently banned.\n"
             if message.content == "no":
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()       
             return [reply]
 
         if self.state == State.REVIEW_ANOTHER:
@@ -490,6 +497,19 @@ class Review:
                 time_reported=row[11]
             ) for row in pending_reports if row[10] != 'resolved'
         ]
+    
+    def blacklist_link(self, url):
+        logger.debug(f"Blacklisting link {url}")
+        try:
+            self.client.db_cursor.execute('''
+                INSERT INTO blacklisted_links (blacklisted_link)
+                VALUES (?)
+            ''', (url,))
+            self.client.db_connection.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Error blacklisting link {url}")
+            self.client.db_connection.rollback()
+
 
     def mark_report_resolved(self):
         logger.debug(f"Marking report {self.report.report_id} as resolved")
