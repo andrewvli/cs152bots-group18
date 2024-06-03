@@ -17,7 +17,6 @@ logger.addHandler(handler)
 LOWER_PRIORITY = 2
 HIGHER_PRIORITY = 1
 
-
 class State(Enum):
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
@@ -133,7 +132,7 @@ class Report:
 
             self.state = State.MESSAGE_IDENTIFIED
             self.reported_user = message.author.name
-            self.reported_message = message.content
+            self.reported_message = message
             reply = "I found this message:" + "```" + \
                 message.author.name + ": " + message.content + "```" + "\n\n"
             reply += "Why are you reporting this message? Please select the number corresponding to the appropriate category.\n"
@@ -446,14 +445,15 @@ class Report:
         return self.state == State.BLOCK_COMPLETE
 
     def save_report(self, db_cursor, db_connection):
+        self.reported_message = self.reported_message.id
         report_data = {
             "reported_user_id": self.reported_user_id,
             "reporter_user_id": self.reporter_user_id,
             "reportee": self.reportee,
             "reported_user": self.reported_user,
             "reported_message": self.reported_message,
-            "report_category": self.report_category,  # Directly use as string
-            "report_subcategory": self.report_subcategory,  # Directly use as string
+            "report_category": self.report_category.name,  # Directly use as string
+            "report_subcategory": self.report_subcategory.name if self.report_subcategory is not None else "",  # Directly use as string
             "additional_details": self.additional_details,
             "priority": self.priority,
             "report_status": self.report_status,

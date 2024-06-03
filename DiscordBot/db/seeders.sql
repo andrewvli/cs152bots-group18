@@ -4,25 +4,25 @@ VALUES
     ('alice', 'active'),
     ('bob', 'banned');
 
-INSERT INTO reports
-    (reported_user_id, reporter_user_id, reportee, reported_user, reported_message, report_category, report_subcategory, additional_details, priority, report_status)
-VALUES
-    (
-        (SELECT user_id
-        FROM users
-        WHERE username='alice'),
-        (SELECT user_id
-        FROM users
-        WHERE username='bob'),
-        'bob',
-        'alice',
-        'User Alice was verbally abusive.',
-        'harassment',
-        'verbal abuse',
-        NULL,
-        1,
-        'pending'
-    );
+-- INSERT INTO reports
+--     (reported_user_id, reporter_user_id, reportee, reported_user, reported_message, report_category, report_subcategory, additional_details, priority, report_status)
+-- VALUES
+--     (
+--         (SELECT user_id
+--         FROM users
+--         WHERE username='alice'),
+--         (SELECT user_id
+--         FROM users
+--         WHERE username='bob'),
+--         'bob',
+--         'alice',
+--         'User Alice was verbally abusive.',
+--         'harassment',
+--         'verbal abuse',
+--         NULL,
+--         1,
+--         'pending'
+--     );
 
 INSERT INTO messages
     (user_id, content, channel_id)
