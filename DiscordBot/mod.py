@@ -43,6 +43,7 @@ class State(Enum):
     REVIEWING_FRAUD_SCAM_2 = auto()
     REVIEWING_FINANCIAL = auto()
     REVIEWING_LINKS = auto()
+    REVIEWING_CORRECT_LINKS = auto()
     REVIEWING_MISINFORMATION = auto()
     REVIEWING_MISINFORMATION_2 = auto()
     REVIEWING_HATE_HARASSMENT = auto()
@@ -54,7 +55,6 @@ class State(Enum):
     REVIEWING_FURTHER_ACTION_2 = auto()
     REVIEW_ANOTHER = auto()
     REVIEW_COMPLETE = auto()
-
 
 # There should be a file called 'tokens.json' inside the same folder as this file
 token_path = 'tokens.json'
@@ -98,14 +98,29 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                await self.report.reported_message.delete()
-                self.mark_report_resolved()
-                reply = "The violating content has been removed.\n"
-                reply += await self.prompt_new_review()
+                self.state = State.REVIEWING_CORRECT_LINKS
+                reply = "Is the message classified as financial fraud or scam?"
                 return [reply]
             else:
                 reply = "Does this content violate platform policies? Please respond with `yes` or `no`."
                 self.state = State.REVIEWING_RECLASSIFICATION
+                return [reply]
+            
+        if self.state == State.REVIEWING_CORRECT_LINKS:
+            if message.content.lower() not in ["yes", "no"]:
+                logger.debug(
+                    f"Invalid response in REVIEWING_VIOLATION state: {message.content}")
+                return ["Please respond with `yes` or `no`."]
+        
+            if message.content == "yes":
+                self.state = State.REVIEWING_LINKS
+                reply = "Does the reported message contain any harmful links? Please respond with `yes` or `no`.\n"
+                return [reply]
+            else:
+                await self.report.reported_message.delete()
+                reply = "The violating content has been removed.\n"
+                self.mark_report_resolved()
+                reply += await self.prompt_new_review()
                 return [reply]
 
         if self.state == State.REVIEWING_RECLASSIFICATION:
