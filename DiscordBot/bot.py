@@ -213,15 +213,6 @@ class ModBot(discord.Client):
         if output.flagged:
             print(f"Flagged content: {message_content}")
             print(f"Output: {output}")
-    
-    def code_format(self, text):
-        ''''
-        TODO: Once you know how you want to show that a message has been 
-        evaluated, insert your code here for formatting the string to be 
-        shown in the mod channel. 
-        '''
-        return "Evaluated: '" + text+ "'"
-    
 
     async def check_blacklist(self, urls):
         placeholders = ','.join('?' for _ in urls)  # Create a string of placeholders
