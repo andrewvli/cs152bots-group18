@@ -452,8 +452,8 @@ class Report:
             "reportee": self.reportee,
             "reported_user": self.reported_user,
             "reported_message": self.reported_message,
-            "report_category": self.report_category.name,  # Directly use as string
-            "report_subcategory": self.report_subcategory.name if self.report_subcategory is not None else "",  # Directly use as string
+            "report_category": self.report_category.name if not isinstance(self.report_category, str) else self.report_category,  # Directly use as string
+            "report_subcategory": self.report_subcategory.name if self.report_subcategory is not None and not isinstance(self.report_subcategory, str) else "",  # Directly use as string
             "additional_details": self.additional_details,
             "priority": self.priority,
             "report_status": self.report_status,

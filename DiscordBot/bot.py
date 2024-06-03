@@ -174,13 +174,19 @@ class ModBot(discord.Client):
             elif author_id in self.reviews:
                 responses = await self.reviews[author_id].handle_review(message)
         else:
-            openai_flag_type = await self.evaluate_message_openai(message.content)
-            perspective_flag_types = await self.evaluate_message_perspective(message.content)
             urls = re.findall(r'(https?://\S+)', message.content)
+            if not urls:
+                # Perspective doesn't seem to work well when the input text contains URLs
+                openai_flag_type = await self.evaluate_message_openai(message.content)
+                perspective_flag_types = await self.evaluate_message_perspective(message.content)
+                if openai_flag_type or perspective_flag_types:
+                    await self.handle_offensive_message(message, openai_flag_type, perspective_flag_types)
+                return
+            
             result = await self.check_urls(urls)
-            if openai_flag_type or perspective_flag_types:
-                await self.handle_offensive_message(message, openai_flag_type, perspective_flag_types)
-            elif len(result) > 0:
+            blacklist_check = await self.check_blacklist(urls)
+
+            if len(result) > 0 or len(blacklist_check) > 0:
                 print("result:", result)
                 warning_message = f"Warning: Potentially harmful link detected in the message below.\n`{message.content}`\n\n"
                 warning_message += "Please be cautious!"
@@ -216,6 +222,25 @@ class ModBot(discord.Client):
         '''
         return "Evaluated: '" + text+ "'"
     
+
+    async def check_blacklist(self, urls):
+        placeholders = ','.join('?' for _ in urls)  # Create a string of placeholders
+        print(placeholders)
+        query = f'''
+            SELECT blacklisted_link 
+            FROM blacklisted_links 
+            WHERE blacklisted_link IN ({placeholders})
+        '''
+        try:
+            self.db_cursor.execute(query, urls)
+            results = self.db_cursor.fetchall()
+            blacklisted_urls = [row[0] for row in results]
+            return blacklisted_urls
+        except sqlite3.Error as e:
+            logger.error(f"Error checking blacklisted links: {e}")
+            return []
+
+    
     async def check_urls(self, urls):
         url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
         payload = {
@@ -235,14 +260,7 @@ class ModBot(discord.Client):
             async with session.post(url, params=params, json=payload) as response:
                 result = await response.json()
                 return result
-
-            flagged_categories = [
-                category for category, flagged in output.categories.dict().items() if flagged]
-
-            if flagged_categories:
-                return flagged_categories[0]
-        return None
-
+            
     async def evaluate_message_perspective(self, message_content):
         client = discovery.build(
             "commentanalyzer",
@@ -291,7 +309,7 @@ class ModBot(discord.Client):
         report.reportee = "System"
         report.reporter_user_id = self.user.id
         report.reported_user = message.author.name
-        report.reported_message = message.content
+        report.reported_message = message
         report.time_reported = datetime.now()
         
         additional_details = []
@@ -312,8 +330,6 @@ class ModBot(discord.Client):
         else:
             report.priority = 2
 
-        report.save_report(self.db_cursor, self.db_connection)
-
         mod_channel = self.mod_channels.get(message.guild.id)
         if mod_channel:
             await mod_channel.send(
@@ -326,20 +342,21 @@ class ModBot(discord.Client):
             )
         else:
             logger.warning("No mod channel found for the guild.")
+
         report.save_report(self.db_cursor, self.db_connection)
 
 
     async def handle_offensive_message(self, message, openai_flag_type, perspective_flag_types):
-        try:
-            await message.delete()
-        except discord.errors.NotFound:
-            logger.warning(f"Message {message.id} already deleted.")
+        # try:
+        #     await message.delete()
+        # except discord.errors.NotFound:
+        #     logger.warning(f"Message {message.id} already deleted.")
 
-        await message.author.send(
-            f"Your message in {message.channel.name} was removed because it was flagged as "
-            f"{openai_flag_type or ', '.join(perspective_flag_types)}. "
-            "Please be mindful of the community guidelines."
-        )
+        # await message.author.send(
+        #     f"Your message in {message.channel.name} was removed because it was flagged as "
+        #     f"{openai_flag_type or ', '.join(perspective_flag_types)}. "
+        #     "Please be mindful of the community guidelines."
+        # )
 
         await self.generate_report(message, openai_flag_type, perspective_flag_types)
 
