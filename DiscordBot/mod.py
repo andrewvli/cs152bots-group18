@@ -412,7 +412,7 @@ class Review:
                     f"Invalid response in REVIEW_ANOTHER state: {message.content}")
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
-                reply = self.start_review(self.fetch_pending_reports()
+                reply = self.start_review(self.fetch_pending_reports())
                 return [reply]
             else:
                 self.state = State.REVIEW_COMPLETE
