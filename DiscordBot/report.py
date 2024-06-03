@@ -132,7 +132,6 @@ class Report:
 
             self.state = State.MESSAGE_IDENTIFIED
             self.reported_user = message.author.name
-            print(type(message.id))
             self.reported_message = message
             reply = "I found this message:" + "```" + \
                 message.author.name + ": " + message.content + "```" + "\n\n"
