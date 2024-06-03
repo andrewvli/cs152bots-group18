@@ -8,6 +8,7 @@ import sqlite3
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+CHANNEL_ID = 1211760624997105665
 
 class ReportState(Enum):
     # Abuse Types
@@ -58,13 +59,14 @@ class Review:
         self.client = client
         self.message = None
         self.report = None
+        self.channel = client.get_channel(CHANNEL_ID)
 
     async def handle_review(self, message):
         logger.debug(
             f"Handling review with state: {self.state} and message: {message.content}")
 
         if message.content.startswith(self.START_KEYWORD):
-            pending_reports = self.fetch_pending_reports()
+            pending_reports = await self.fetch_pending_reports()
             if not pending_reports:
                 reply = "There are no pending reports to review.\n"
                 return [reply]
@@ -82,8 +84,9 @@ class Review:
             
             if message.content == "yes":
                 await self.report.reported_message.delete()
+                self.mark_report_resolved()
                 reply = "The violating content has been removed.\n"
-                reply += self.prompt_new_review()
+                reply += await self.prompt_new_review()
                 return [reply]
             else:
                 reply = "Does this content violate platform policies? Please respond with `yes` or `no`."
@@ -208,7 +211,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += self.prompt_new_review()
+            self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
 
         if self.state == State.REVIEWING_HARM_ENDANGERMENT:
@@ -220,7 +224,8 @@ class Review:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             else:
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-                reply += self.prompt_new_review()
+                reply += await self.prompt_new_review()
+                self.mark_report_resolved()
                 return [reply]
                     
         if self.state == State.REVIEWING_SEXUALLY_EXPLICIT:
@@ -234,7 +239,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             if message.content == "2":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_FRAUD_SCAM:
@@ -268,7 +274,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
 
         if self.state == State.REVIEWING_FINANCIAL:
@@ -288,7 +295,8 @@ class Review:
             if message.content == "yes":
                 reply += "The harmful links have been blacklisted.\n"
             reply += "The reported user has been permanently banned.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_MISINFORMATION:
@@ -312,7 +320,8 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
                 reply = "The reported user has been flagged.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_HATE_HARASSMENT:
@@ -338,13 +347,14 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_CSAM:
             logger.debug("State: REVIEWING_CSAM")
             reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_INTELLECTUAL:
@@ -355,7 +365,8 @@ class Review:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             reply = "The reported user has been flagged.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_ILLICIT:
@@ -369,7 +380,8 @@ class Review:
                 reply = "The reported user has been flagged.\n"
             if message.content == "3":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
                 
         if self.state == State.REVIEWING_FURTHER_ACTION:            
@@ -384,7 +396,8 @@ class Review:
                 reply = "This report will be escalated to a higher moderation team for additional review.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
 
         if self.state == State.REVIEWING_NONVIOLATION:
@@ -399,7 +412,8 @@ class Review:
                 reply = "The reporting user has been permanently banned.\n"
             if message.content == "no":
                 reply = "No further action will be taken.\n"
-            reply += self.prompt_new_review()
+            reply += await self.prompt_new_review()
+            self.mark_report_resolved()
             return [reply]
 
         if self.state == State.REVIEW_ANOTHER:
@@ -412,7 +426,7 @@ class Review:
                     f"Invalid response in REVIEW_ANOTHER state: {message.content}")
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
-                reply = self.start_review(self.fetch_pending_reports())
+                reply = self.start_review(await self.fetch_pending_reports())
                 return [reply]
             else:
                 self.state = State.REVIEW_COMPLETE
@@ -427,7 +441,7 @@ class Review:
         self.report = pending_reports.pop(0)
 
         reply += f"User reported: `{self.report.reported_user}`\n"
-        reply += f"Message reported: `{self.report.reported_message}`\n"
+        reply += f"Message reported: `{self.report.reported_message.content}`\n"
         reply += f"Report category: {self.report.report_category}\n"
         reply += f"Report subcategory: {self.report.report_subcategory}\n"
         reply += f"Additional details filed by reporting: {self.report.additional_details}\n\n"
@@ -437,10 +451,10 @@ class Review:
         logger.debug(f"State changed to: {self.state}")
         return reply
 
-    def prompt_new_review(self):
+    async def prompt_new_review(self):
         logger.debug("Prompting new review")
         reply = "Thank you for reviewing this report.\n"
-        pending_reports = self.fetch_pending_reports()
+        pending_reports = await self.fetch_pending_reports()
         if not pending_reports:
             reply += "There are no more pending reports to review.\n"
             self.state = State.REVIEW_COMPLETE
@@ -452,7 +466,7 @@ class Review:
 
         return reply
 
-    def fetch_pending_reports(self):
+    async def fetch_pending_reports(self):
         logger.debug("Fetching pending reports")
         self.client.db_cursor.execute('''
             SELECT report_id, reported_user_id, reporter_user_id, reportee, reported_user, reported_message, 
@@ -467,14 +481,14 @@ class Review:
                 reporter_user_id=row[2],
                 reportee=row[3],
                 reported_user=row[4],
-                reported_message=row[5],
+                reported_message=await self.channel.fetch_message(row[5]) if row[10] != 'resolved' else None,
                 report_category=row[6],
                 report_subcategory=row[7],
                 additional_details=row[8],
                 priority=row[9],
                 report_status=row[10],
                 time_reported=row[11]
-            ) for row in pending_reports
+            ) for row in pending_reports if row[10] != 'resolved'
         ]
 
     def mark_report_resolved(self):

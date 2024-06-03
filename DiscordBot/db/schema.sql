@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS reports (
     reporter_user_id INTEGER,
     reportee TEXT,
     reported_user TEXT,
-    reported_message TEXT,
+    reported_message INTEGER,
     report_category TEXT,
     report_subcategory TEXT,
     additional_details TEXT,
