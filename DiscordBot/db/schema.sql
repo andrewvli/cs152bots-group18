@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS reports;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS user_history;
 DROP TABLE IF EXISTS moderation_history;
+DROP TABLE IF EXISTS blacklisted_links;
 
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,4 +56,9 @@ CREATE TABLE IF NOT EXISTS moderation_history (
     action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (moderator_user_id) REFERENCES users (user_id),
     FOREIGN KEY (affected_user_id) REFERENCES users (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS blacklisted_links (
+    blacklisted_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    blacklisted_link TEXT NOT NULL
 );

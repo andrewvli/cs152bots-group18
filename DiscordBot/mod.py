@@ -1,8 +1,13 @@
 from enum import Enum, auto
 import logging
+import aiohttp
 import discord
 from report import Report
 import sqlite3
+import re
+import heapq
+import json
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -38,6 +43,7 @@ class State(Enum):
     REVIEWING_FRAUD_SCAM_2 = auto()
     REVIEWING_FINANCIAL = auto()
     REVIEWING_LINKS = auto()
+    REVIEWING_CORRECT_LINKS = auto()
     REVIEWING_MISINFORMATION = auto()
     REVIEWING_MISINFORMATION_2 = auto()
     REVIEWING_HATE_HARASSMENT = auto()
@@ -50,6 +56,15 @@ class State(Enum):
     REVIEW_ANOTHER = auto()
     REVIEW_COMPLETE = auto()
 
+# There should be a file called 'tokens.json' inside the same folder as this file
+token_path = 'tokens.json'
+if not os.path.isfile(token_path):
+    raise Exception(f"{token_path} not found!")
+with open(token_path) as f:
+    # If you get an error here, it means your token is formatted incorrectly. Did you put it in quotes?
+    tokens = json.load(f)
+    discord_token = tokens['discord']
+    google_apikey = tokens['google']
 
 class Review:
     START_KEYWORD = "review"
@@ -83,14 +98,29 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             
             if message.content == "yes":
-                await self.report.reported_message.delete()
-                self.mark_report_resolved()
-                reply = "The violating content has been removed.\n"
-                reply += await self.prompt_new_review()
+                self.state = State.REVIEWING_CORRECT_LINKS
+                reply = "Is the message classified as financial fraud or scam?"
                 return [reply]
             else:
                 reply = "Does this content violate platform policies? Please respond with `yes` or `no`."
                 self.state = State.REVIEWING_RECLASSIFICATION
+                return [reply]
+            
+        if self.state == State.REVIEWING_CORRECT_LINKS:
+            if message.content.lower() not in ["yes", "no"]:
+                logger.debug(
+                    f"Invalid response in REVIEWING_VIOLATION state: {message.content}")
+                return ["Please respond with `yes` or `no`."]
+        
+            if message.content == "yes":
+                self.state = State.REVIEWING_LINKS
+                reply = "Does the reported message contain any harmful links? Please respond with `yes` or `no`.\n"
+                return [reply]
+            else:
+                await self.report.reported_message.delete()
+                reply = "The violating content has been removed.\n"
+                self.mark_report_resolved()
+                reply += await self.prompt_new_review()
                 return [reply]
 
         if self.state == State.REVIEWING_RECLASSIFICATION:
@@ -209,6 +239,14 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
                 reply = "The reported user has been permanently banned.\n"
+                harmful_links = await self.find_urls()
+                if len(harmful_links) > 0:
+                    extracted_urls = await self.extract_harmful_urls(harmful_links)
+                    reply = "The reported messasge contains potentially harmful links.\n"
+                    reply += f"`{extracted_urls}\n`"
+                    reply += "Do the links need to be blacklisted? Please respond with `yes` or `no`."
+                    self.state = State.REVIEWING_FRAUD_SCAM_2
+                    return [reply]
             else:
                 reply = "No further action will be taken.\n"
             self.mark_report_resolved()
@@ -224,8 +262,8 @@ class Review:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             else:
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-                reply += await self.prompt_new_review()
                 self.mark_report_resolved()
+                reply += await self.prompt_new_review()
                 return [reply]
                     
         if self.state == State.REVIEWING_SEXUALLY_EXPLICIT:
@@ -239,8 +277,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             if message.content == "2":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_FRAUD_SCAM:
@@ -274,8 +312,8 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
 
         if self.state == State.REVIEWING_FINANCIAL:
@@ -292,11 +330,16 @@ class Review:
             if message.content != "yes" and message.content != "no":
                 return ["Please respond with `yes` or `no`."]
             reply = ""
+
             if message.content == "yes":
+                urls = re.findall(r'(https?://\S+)', self.report.reported_message.content)
+                for url in urls:
+                    self.blacklist_link(url)
                 reply += "The harmful links have been blacklisted.\n"
+            
             reply += "The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_MISINFORMATION:
@@ -320,8 +363,8 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
             if message.content == "yes":
                 reply = "The reported user has been flagged.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_HATE_HARASSMENT:
@@ -347,13 +390,14 @@ class Review:
                 reply = "The reported user has been permanently banned.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_CSAM:
             logger.debug("State: REVIEWING_CSAM")
             reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
+            self.mark_report_resolved()
             reply += await self.prompt_new_review()
             return [reply]
                 
@@ -365,8 +409,8 @@ class Review:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             reply = "The reported user has been flagged.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_ILLICIT:
@@ -380,8 +424,8 @@ class Review:
                 reply = "The reported user has been flagged.\n"
             if message.content == "3":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
                 
         if self.state == State.REVIEWING_FURTHER_ACTION:            
@@ -396,8 +440,8 @@ class Review:
                 reply = "This report will be escalated to a higher moderation team for additional review.\n"
             else:
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()
             return [reply]
 
         if self.state == State.REVIEWING_NONVIOLATION:
@@ -412,8 +456,8 @@ class Review:
                 reply = "The reporting user has been permanently banned.\n"
             if message.content == "no":
                 reply = "No further action will be taken.\n"
-            reply += await self.prompt_new_review()
             self.mark_report_resolved()
+            reply += await self.prompt_new_review()       
             return [reply]
 
         if self.state == State.REVIEW_ANOTHER:
@@ -490,6 +534,19 @@ class Review:
                 time_reported=row[11]
             ) for row in pending_reports if row[10] != 'resolved'
         ]
+    
+    def blacklist_link(self, url):
+        logger.debug(f"Blacklisting link {url}")
+        try:
+            self.client.db_cursor.execute('''
+                INSERT INTO blacklisted_links (blacklisted_link)
+                VALUES (?)
+            ''', (url,))
+            self.client.db_connection.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Error blacklisting link {url}")
+            self.client.db_connection.rollback()
+
 
     def mark_report_resolved(self):
         logger.debug(f"Marking report {self.report.report_id} as resolved")
@@ -503,3 +560,37 @@ class Review:
         except sqlite3.Error as e:
             logger.error(f"Error marking report as resolved: {e}")
             self.client.db_connection.rollback()
+    
+    async def find_urls(self):
+        urls = re.findall(r'(https?://\S+)', self.report.reported_message.content)
+        result = await self.check_urls(urls)
+        return result
+    
+    async def check_urls(self, urls):
+        url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+        payload = {
+            'client': {
+                'clientId': "discord-bot",
+                'clientVersion': "0.1"
+            },
+            'threatInfo': {
+                'threatTypes': ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION", "THREAT_TYPE_UNSPECIFIED"],
+                'platformTypes': ["ANY_PLATFORM", "PLATFORM_TYPE_UNSPECIFIED", "WINDOWS", "LINUX", "ANDROID", "OSX", "IOS", "CHROME"],
+                'threatEntryTypes': ["URL", "THREAT_ENTRY_TYPE_UNSPECIFIED", "EXECUTABLE"],
+                'threatEntries': [{"url": u} for u in urls]
+            }
+        }
+        params = {'key': google_apikey} 
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, params=params, json=payload) as response:
+                result = await response.json()
+                return result
+            
+    async def extract_harmful_urls(self, api_response):
+        urls = set()  # Use a set to avoid duplicate URLs
+        if 'matches' in api_response:
+            for match in api_response['matches']:
+                url = match.get('threat', {}).get('url', '')
+                if url:  # Ensure the URL is not empty
+                    urls.add(url)
+        return list(urls)  # Convert the set back to a list if necessary
