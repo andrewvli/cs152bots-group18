@@ -288,7 +288,7 @@ class Review:
         if self.state == State.REVIEWING_INTELLECTUAL:
             if message.content not in ["1", "2"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
-            reply = "The reported user has been flagged for intellectual property violation.\n"
+            reply = "The reported user has been flagged.\n"
             reply += self.prompt_new_review()
             return [reply]
                 
@@ -296,7 +296,7 @@ class Review:
             if message.content not in ["1", "2", "3"]:
                 return ["That is not a valid option. Please select the number corresponding to the appropriate subcategory for the violating content, or say `cancel` to cancel."]
             if message.content in ["1", "2"]:
-                reply = "The reported user has been flagged for illicit trade and substances violation.\n"
+                reply = "The reported user has been flagged.\n"
             if message.content == "3":
                 reply = "This report will be submitted to local authorities. The reported user has been permanently banned.\n"
             reply += self.prompt_new_review()
