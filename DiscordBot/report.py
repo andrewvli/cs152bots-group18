@@ -452,8 +452,8 @@ class Report:
             "reportee": self.reportee,
             "reported_user": self.reported_user,
             "reported_message": self.reported_message,
-            "report_category": self.report_category,  # Directly use as string
-            "report_subcategory": self.report_subcategory,  # Directly use as string
+            "report_category": self.report_category.name,  # Directly use as string
+            "report_subcategory": self.report_subcategory.name,  # Directly use as string
             "additional_details": self.additional_details,
             "priority": self.priority,
             "report_status": self.report_status,
