@@ -1,3 +1,5 @@
+# bot.py
+import aiohttp
 import discord
 from discord.ext import commands
 import os
@@ -174,12 +176,25 @@ class ModBot(discord.Client):
         else:
             openai_flag_type = await self.evaluate_message_openai(message.content)
             perspective_flag_types = await self.evaluate_message_perspective(message.content)
-
+            urls = re.findall(r'(https?://\S+)', message.content)
+            result = await self.check_urls(urls)
             if openai_flag_type or perspective_flag_types:
                 await self.handle_offensive_message(message, openai_flag_type, perspective_flag_types)
+            elif len(result) > 0:
+                print("result:", result)
+                warning_message = f"Warning: Potentially harmful link detected in the message below.\n`{message.content}`\n\n"
+                warning_message += "Please be cautious!"
+                await message.channel.send(warning_message)
+
+                if message.author.dm_channel is None:
+                    await message.author.create_dm()
+                author_warning_message = f"Warning: A potentially harmful link was detected in a message you sent.\n`{message.content}\n\n`"
+                author_warning_message += "Please be mindful of platform policies when sharing links."
+                await message.author.dm_channel.send(author_warning_message)
             else:
                 mod_channel = self.mod_channels[message.guild.id]
                 await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+
 
         if responses:
             for r in responses:
@@ -192,6 +207,34 @@ class ModBot(discord.Client):
         if output.flagged:
             print(f"Flagged content: {message_content}")
             print(f"Output: {output}")
+    
+    def code_format(self, text):
+        ''''
+        TODO: Once you know how you want to show that a message has been 
+        evaluated, insert your code here for formatting the string to be 
+        shown in the mod channel. 
+        '''
+        return "Evaluated: '" + text+ "'"
+    
+    async def check_urls(self, urls):
+        url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+        payload = {
+            'client': {
+                'clientId': "discord-bot",
+                'clientVersion': "0.1"
+            },
+            'threatInfo': {
+                'threatTypes': ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION", "THREAT_TYPE_UNSPECIFIED"],
+                'platformTypes': ["ANY_PLATFORM", "PLATFORM_TYPE_UNSPECIFIED", "WINDOWS", "LINUX", "ANDROID", "OSX", "IOS", "CHROME"],
+                'threatEntryTypes': ["URL", "THREAT_ENTRY_TYPE_UNSPECIFIED", "EXECUTABLE"],
+                'threatEntries': [{"url": u} for u in urls]
+            }
+        }
+        params = {'key': google_key} 
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, params=params, json=payload) as response:
+                result = await response.json()
+                return result
 
             flagged_categories = [
                 category for category, flagged in output.categories.dict().items() if flagged]
