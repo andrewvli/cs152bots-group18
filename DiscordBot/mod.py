@@ -183,7 +183,7 @@ class Review:
             if message.content == "yes":
                 reply = "The reported user has been permanently banned.\n"
             else:
-                reply = "The reported user has been temporarily banned.\n"
+                reply = "No further action will be taken.\n"
             reply += self.prompt_new_review()
             return [reply]
 
@@ -227,7 +227,7 @@ class Review:
             if message.content == "yes":
                 reply = "The reported user has been permanently banned.\n"
             else:
-                reply = "The reported user has been temporarily banned.\n"
+                reply = "No further action will be taken.\n"
             reply += self.prompt_new_review()
             return [reply]
 
@@ -276,7 +276,7 @@ class Review:
             if message.content == "yes":
                 reply = "The reported user has been permanently banned.\n"
             else:
-                reply = "The reported user has been temporarily banned.\n"
+                reply = "No further action will be taken.\n"
             reply += self.prompt_new_review()
             return [reply]
                 
@@ -322,7 +322,7 @@ class Review:
                 return ["Please respond with `yes` or `no`."]
                 
             if message.content == "yes":
-                reply = "The reporting user has been temporarily banned.\n"
+                reply = "The reporting user has been permanently banned.\n"
             if message.content == "no":
                 reply = "No further action will be taken.\n"
             reply += self.prompt_new_review()
