@@ -13,6 +13,8 @@ from googleapiclient import discovery
 from report import Report
 from mod import Review
 import heapq
+import Levenshtein
+import requests
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -186,10 +188,22 @@ class ModBot(discord.Client):
             result = await self.check_urls(urls)
             blacklist_check = await self.check_blacklist(urls)
 
-            if len(result) > 0 or len(blacklist_check) > 0:
+            # Direct check for exact matches
+            exact_match = await self.check_exact_match(urls)
+            if exact_match:
+                return
+
+            # Check for domain similarity
+            similar_sites = await self.check_domain_similarity(urls)
+
+            if len(result) > 0 or len(blacklist_check) > 0 or len(similar_sites) > 0:
                 print("result:", result)
                 warning_message = f"Warning: Potentially harmful link detected in the message below.\n`{message.content}`\n\n"
-                warning_message += "Please be cautious!"
+                if len(similar_sites) > 0:
+                    # get only the top 3 similar sites
+                    warning_message += "This website could be impersonating the following popular sites:\n"
+                    for site in similar_sites[:3]:
+                        warning_message += f"{site}\n"
                 await message.channel.send(warning_message)
 
                 if message.author.dm_channel is None:
@@ -200,7 +214,6 @@ class ModBot(discord.Client):
             else:
                 mod_channel = self.mod_channels[message.guild.id]
                 await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-
 
         if responses:
             for r in responses:
@@ -350,6 +363,52 @@ class ModBot(discord.Client):
         # )
 
         await self.generate_report(message, openai_flag_type, perspective_flag_types)
+
+    def domain_similarity(self, domain1, domain2):
+        return Levenshtein.ratio(domain1, domain2)
+    
+    async def check_domain_similarity(self, urls):
+        try:
+            self.db_cursor.execute('SELECT site FROM tranco_top_sites')
+            top_sites = self.db_cursor.fetchall()
+            top_sites = [site[0] for site in top_sites]
+
+            similar_sites = []
+            for url in urls:
+                domain = self.extract_domain(url)
+                for top_site in top_sites:
+                    if self.domain_similarity(domain, top_site) > 0.7:  # similarity threshold
+                        similar_sites.append(top_site)
+            # sort by similarity
+            similar_sites = sorted(similar_sites, key=lambda x: self.domain_similarity(domain, x), reverse=True)
+
+            return similar_sites
+        except sqlite3.Error as e:
+            logger.error(f"Error checking domain similarity: {e}")
+            return []
+    
+    def extract_domain(self, url):
+        match = re.match(r'(https?://)?(www\.)?([^/]+)', url)
+        return match.group(3) if match else url
+
+    async def check_exact_match(self, urls):
+        try:
+            self.db_cursor.execute('SELECT site FROM tranco_top_sites')
+            top_sites = self.db_cursor.fetchall()
+            top_sites = [site[0] for site in top_sites]
+
+            for url in urls:
+                domain = self.extract_domain(url)
+                if domain in top_sites:
+                    return True
+
+            return False
+        except sqlite3.Error as e:
+            logger.error(f"Error checking exact match: {e}")
+            return False
+
+    
+
 
 client = ModBot()
 client.run(discord_token)
